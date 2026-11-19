@@ -1,0 +1,202 @@
+{
+  "common": {
+    "appName": "OnlinePay",
+    "loading": "Loading…",
+    "save": "Save",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "back": "Back",
+    "close": "Close",
+    "retry": "Try again"
+  },
+  "nav": {
+    "dashboard": "My cards",
+    "wallet": "Wallet",
+    "invoices": "Invoices",
+    "notifications": "Notifications",
+    "login": "Log in",
+    "signup": "Get started",
+    "logout": "Log out",
+    "language": "العربية"
+  },
+  "landing": {
+    "heroTitle": "Virtual cards that keep your real card private",
+    "heroSubtitle": "Create a separate card for every shop, subscription and free trial. Freeze or cancel any card in one tap.",
+    "cta": "Get 30 cards for 30 AED",
+    "pricingTitle": "Simple pricing",
+    "pricingBundle": "30 virtual cards",
+    "pricingDetail": "1 AED per card · one-time purchase",
+    "vatNote": "Price excludes 5% VAT. Total at checkout: {total}.",
+    "useCasesTitle": "Made for everyday online life",
+    "useCases": {
+      "shopping": "Online shopping without exposing your bank card",
+      "subscriptions": "One card per subscription — cancel the card, stop the charges",
+      "trials": "Free trials that can't surprise you with a renewal",
+      "privacy": "Keep your main card private everywhere"
+    },
+    "howTitle": "How it works",
+    "how": {
+      "1": "Sign up with your email and UAE mobile number",
+      "2": "Verify your identity with your Emirates ID or passport",
+      "3": "Buy a bundle, top up your wallet and create cards instantly"
+    },
+    "faqTitle": "Questions",
+    "faq": {
+      "q1": "Who can use OnlinePay?",
+      "a1": "UAE residents aged 18 or over with a valid Emirates ID or passport.",
+      "q2": "What happens to money left on a card I cancel?",
+      "a2": "Any remaining balance goes back to your OnlinePay wallet automatically.",
+      "q3": "Do you store my card numbers?",
+      "a3": "No. Card details are shown by our licensed card issuer through a secure window and are never stored on our servers."
+    }
+  },
+  "auth": {
+    "signupTitle": "Create your account",
+    "fullName": "Full name (as on your ID)",
+    "email": "Email",
+    "phone": "UAE mobile number",
+    "phoneHint": "e.g. 050 123 4567",
+    "acceptTerms": "I agree to the Terms of Service and Privacy Policy",
+    "continue": "Continue",
+    "verifyTitle": "Verify your email and phone",
+    "verifyIntro": "We sent a 6-digit code to your email and another to your phone.",
+    "emailCode": "Email code",
+    "phoneCode": "SMS code",
+    "verify": "Verify",
+    "loginTitle": "Log in",
+    "loginIntro": "We'll text a 6-digit code to the mobile number on your account.",
+    "loginCode": "SMS code",
+    "sendCode": "Send code",
+    "haveAccount": "Already have an account? Log in",
+    "noAccount": "New here? Create an account"
+  },
+  "kyc": {
+    "title": "Verify your identity",
+    "intro": "UAE regulations require us to verify your identity before issuing cards. It takes about two minutes.",
+    "documentType": "Document",
+    "emiratesId": "Emirates ID",
+    "passport": "Passport",
+    "nationality": "Nationality (2-letter code, e.g. AE, IN)",
+    "dob": "Date of birth",
+    "start": "Start verification",
+    "privacyNote": "Your ID document is captured and stored by our verification partner, not by OnlinePay.",
+    "status": {
+      "NOT_STARTED": "Not started",
+      "PENDING": "We're reviewing your documents. This usually takes a few minutes.",
+      "APPROVED": "You're verified.",
+      "REJECTED": "We couldn't verify your identity. Please contact support.",
+      "NEEDS_INFO": "We need more information. Please contact support."
+    }
+  },
+  "dashboard": {
+    "title": "My cards",
+    "remaining": "{remaining} of {purchased} cards left",
+    "buyBundle": "Buy 30 cards",
+    "createCard": "Create card",
+    "cardLabel": "Card name",
+    "cardLabelPlaceholder": "e.g. Netflix",
+    "noCards": "No cards yet. Create your first one.",
+    "walletBalance": "Wallet balance",
+    "kycRequired": "Verify your identity to start creating cards.",
+    "verifyNow": "Verify now",
+    "bundleNeeded": "You've used all your cards. Buy another bundle to create more.",
+    "showCancelled": "Show cancelled cards"
+  },
+  "card": {
+    "status": { "ACTIVE": "Active", "FROZEN": "Frozen", "CANCELLED": "Cancelled" },
+    "balance": "Balance",
+    "expires": "Expires",
+    "freeze": "Freeze",
+    "unfreeze": "Unfreeze",
+    "cancel": "Cancel card",
+    "cancelConfirm": "Cancel this card permanently? Any remaining balance returns to your wallet. This can't be undone.",
+    "reveal": "Show card details",
+    "hide": "Hide card details",
+    "revealNote": "Card details are displayed securely by our card issuer and are never stored by OnlinePay.",
+    "fund": "Add money",
+    "fundAmount": "Amount (AED)",
+    "limit": "Spending limit",
+    "limitAmount": "Limit (AED)",
+    "noLimit": "No limit",
+    "removeLimit": "Remove limit",
+    "rename": "Rename",
+    "transactions": "Transactions",
+    "noTransactions": "No transactions yet.",
+    "dispute": "Report a problem",
+    "simulate": "Simulate a test purchase (dev only)",
+    "txnStatus": { "PENDING": "Pending", "SETTLED": "Completed", "REVERSED": "Reversed", "DECLINED": "Declined" }
+  },
+  "wallet": {
+    "title": "Wallet",
+    "balance": "Available balance",
+    "topUp": "Top up",
+    "amount": "Amount (AED)",
+    "history": "History",
+    "empty": "No wallet activity yet.",
+    "types": {
+      "TOPUP": "Top-up",
+      "CARD_FUND": "Moved to card",
+      "CARD_FUND_REVERSAL": "Card load reversed",
+      "CARD_CANCEL_RETURN": "Returned from cancelled card",
+      "REFUND": "Refund",
+      "ADJUSTMENT": "Adjustment"
+    }
+  },
+  "invoices": {
+    "title": "Invoices",
+    "taxInvoice": "Tax invoice",
+    "number": "Invoice no.",
+    "date": "Date",
+    "seller": "Seller",
+    "buyer": "Customer",
+    "trn": "TRN",
+    "description": "Description",
+    "subtotal": "Subtotal (excl. VAT)",
+    "vat": "VAT ({rate}%)",
+    "total": "Total (incl. VAT)",
+    "print": "Print / save as PDF",
+    "empty": "No invoices yet."
+  },
+  "notifications": {
+    "title": "Notifications",
+    "markRead": "Mark all as read",
+    "empty": "You're all caught up."
+  },
+  "checkout": {
+    "title": "Buy 30 virtual cards",
+    "subtotal": "Price",
+    "vat": "VAT 5%",
+    "total": "Total",
+    "pay": "Pay securely",
+    "methods": "Card, Apple Pay or Google Pay on our payment partner's secure page.",
+    "result": {
+      "success": "Payment successful — your cards are ready.",
+      "processing": "We're confirming your payment…",
+      "cancelled": "Payment cancelled. You haven't been charged.",
+      "failed": "Payment failed. Please try again."
+    },
+    "gotoDashboard": "Go to my cards"
+  },
+  "legal": {
+    "terms": "Terms of Service",
+    "privacy": "Privacy Policy",
+    "fees": "Fees",
+    "reviewNotice": "Draft — requires legal review before launch."
+  },
+  "errors": {
+    "generic": "Something went wrong. Please try again.",
+    "ACCOUNT_EXISTS": "An account with this email or phone already exists. Please log in.",
+    "OTP_INVALID": "That code isn't right.",
+    "OTP_EXPIRED": "That code has expired. Request a new one.",
+    "OTP_TOO_MANY_ATTEMPTS": "Too many attempts. Request a new code.",
+    "OTP_RATE_LIMITED": "Too many codes requested. Try again later.",
+    "KYC_REQUIRED": "Please verify your identity first.",
+    "BUNDLE_EXHAUSTED": "You've used all your cards. Buy another bundle.",
+    "INSUFFICIENT_WALLET_BALANCE": "Not enough money in your wallet. Top up first.",
+    "CARD_ACTION_NOT_ALLOWED": "That action isn't available for this card.",
+    "VALIDATION_ERROR": "Please check the highlighted details."
+  },
+  "footer": {
+    "issuer": "Cards are issued by our licensed issuing partner via NymCard. OnlinePay is a programme manager, not a bank."
+  }
+}

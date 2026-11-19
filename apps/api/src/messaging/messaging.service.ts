@@ -30,6 +30,8 @@ export class MessagingService {
         if (env.NODE_ENV === 'production') throw new Error('Console SMS provider disabled in production');
         // Deliberately bypasses redaction so developers can read dev OTPs.
         process.stdout.write(`\n[DEV SMS to ${to}] ${text}\n`);
+        // Mirror to Mailpit so SMS codes are readable in the browser and by e2e tests.
+        await this.sendEmail(`sms+${to.replace(/\D/g, '')}@onlinepay.local`, `SMS to ${to}`, text);
         return;
       default:
         // TODO: add a UAE SMS provider adapter (sender ID must be registered with the TDRA).
