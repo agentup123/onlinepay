@@ -59,8 +59,8 @@ jobs:
       - run: pnpm db:generate
       - run: pnpm db:deploy
       - run: pnpm --filter @onlinepay/shared build && pnpm --filter @onlinepay/db build
+      - run: pnpm format:check
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm test
       - run: pnpm build
-      - run: pnpm format:check
