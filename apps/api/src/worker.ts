@@ -19,6 +19,7 @@ import { parseNymCardEvent } from './nymcard/nymcard.webhook';
 import type { NymCardEvent } from './nymcard/nymcard.types';
 import type { GatewayEvent } from './payments/gateway.types';
 import { CardsService } from './cards/cards.service';
+import { KycService } from './kyc/kyc.service';
 import { WebhooksService } from './webhooks/webhooks.service';
 
 @Module({
@@ -39,6 +40,7 @@ async function bootstrap() {
   const reconciliation = app.get(ReconciliationService);
   const cards = app.get(CardsService);
   const webhooks = app.get(WebhooksService);
+  const kyc = app.get(KycService);
   const queues = app.get(QueueService);
   const connection = app.get<Redis>(REDIS).duplicate({ maxRetriesPerRequest: null });
 
@@ -93,6 +95,9 @@ async function bootstrap() {
         if (job.name === 'reconcile-cards') {
           await reconciliation.run();
           await payments.expireStalePurchases();
+          // Ongoing sanctions/PEP screening of approved customers.
+          const rescreen = await kyc.rescreenApproved();
+          logger.log(`Rescreen: ${JSON.stringify(rescreen)}`);
         }
         if (job.name === 'resume-operations') {
           // Finish anything interrupted by a crash or an issuer/gateway timeout.

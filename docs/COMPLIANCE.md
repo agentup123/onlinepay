@@ -25,10 +25,13 @@
   compliance can revoke an approval (REJECTED / NEEDS_INFO); suspend the user as well to freeze
   existing cards.
 - Stored-value limits on the wallet (DECISIONS D13) and a `HIGH_TOPUP` monitoring flag.
-- **⚖ needs review:** which KYC provider satisfies NymCard's onboarding rules; sanctions/PEP
-  screening (at onboarding and ongoing) — the KYC provider adapter needs a screening hook once a
-  vendor is chosen; risk-rating; re-verification when documents expire; date of birth and
-  nationality should come from the provider's document extraction, not user input.
+- Sanctions/PEP screening runs before every approval and nightly for approved customers (30-day
+  cycle); hits go to compliance with a flag and need a written disposition to approve. Date of
+  birth and nationality from the vendor's document extraction replace user input. See
+  `docs/KYC_INTEGRATION.md`.
+- **⚖ needs review:** which KYC and screening vendor satisfies NymCard's onboarding rules (agree
+  with NymCard, then implement the adapters); lists to screen against (UAE Local Terrorist List,
+  UN, others per your MLRO); risk-rating; re-verification when documents expire.
 - Transaction monitoring rules (`apps/api/src/monitoring/monitoring.rules.ts`): high amount,
   velocity, decline bursts, risky MCCs. Thresholds are placeholders — agree them with your
   **MLRO**. Escalated flags may need a Suspicious Transaction Report via **goAML** (UAE FIU).
@@ -81,7 +84,8 @@
 - [ ] Penetration test; dependency scanning (Dependabot / `pnpm audit`)
 - [ ] Centralised logging with retention, alerting on webhook failures and flag spikes
 - [ ] Backups and restore drill; incident response and breach notification runbook
-- [ ] Real SMS provider with a TDRA-registered sender ID
-- [ ] Real KYC provider adapter (`KYC_PROVIDER` only offers `mock`, which production refuses — the
-      API will not boot in production until one is added)
+- [ ] Twilio account with a TDRA-registered UAE sender ID (`SMS_PROVIDER=twilio`; the console
+      provider is refused in production)
+- [ ] KYC + screening vendor adapters (`docs/KYC_INTEGRATION.md`) — production refuses the mocks,
+      so the API will not boot until they are added
 - [ ] Set `TRUST_PROXY_HOPS` to the real number of proxies and keep the API port private

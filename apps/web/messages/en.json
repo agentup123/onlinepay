@@ -25,7 +25,7 @@
     "cta": "Get 30 cards for 30 AED",
     "pricingTitle": "Simple pricing",
     "pricingBundle": "30 virtual cards",
-    "pricingDetail": "1 AED + VAT per card · one-time purchase",
+    "pricingDetail": "1 AED per card, VAT included · one-time purchase",
     "vatNote": "Includes 5% VAT ({vat}). Price before VAT: {subtotal}.",
     "useCasesTitle": "Made for everyday online life",
     "useCases": {
@@ -216,7 +216,8 @@
     "ISSUER_REJECTED": "The card issuer declined this request.",
     "ISSUER_UNAVAILABLE": "The card issuer is not responding. Please try again shortly.",
     "WALLET_LIMIT_EXCEEDED": "This top-up would take your wallet above its maximum balance.",
-    "TOPUP_LIMIT_EXCEEDED": "This top-up would exceed your 30-day top-up limit."
+    "TOPUP_LIMIT_EXCEEDED": "This top-up would exceed your 30-day top-up limit.",
+    "SMS_DELIVERY_FAILED": "We couldn't send the SMS code. Please try again in a moment."
   },
   "footer": {
     "issuer": "Cards are issued by our licensed issuing partner via NymCard. OnlinePay is a programme manager, not a bank."

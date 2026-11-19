@@ -27,6 +27,7 @@ import {
   IssuerRejectedError,
   NYMCARD_CLIENT,
   NymCardClient,
+  type FundsResult,
   type IssuerCard,
 } from '../nymcard/nymcard.types';
 
@@ -41,6 +42,9 @@ type Db = Prisma.TransactionClient | PrismaService;
 export const STALE_OPERATION_MS = 2 * 60 * 1000;
 
 const OPEN_OPERATION = ['PENDING', 'UNKNOWN'] as const;
+
+/** After this many unresolved attempts (~50 min of resume runs) ops is alerted to check by hand. */
+const UNRESOLVED_AFTER_ATTEMPTS = 10;
 
 const publicCard = (c: Card) => ({
   id: c.id,
@@ -487,27 +491,62 @@ export class CardsService {
       return { status: funding.status, balanceFils: funding.card.availableBalanceFils };
     }
 
-    let result: { providerRef: string; balanceFils: number };
-    try {
-      result = await this.nymcard.loadFunds(
-        funding.card.nymcardCardId,
-        funding.amountFils,
-        `fund-${funding.id}`,
-      );
-    } catch (err) {
-      if (err instanceof IssuerRejectedError) {
-        await this.failFunding(funding.id, errorText(err));
-        throw err;
+    const issuerKey = `fund-${funding.id}`;
+
+    // Not the first attempt (earlier one timed out, or the process died mid-call): ask NymCard
+    // whether that load already happened before sending anything again. If the lookup itself
+    // fails we stay UNKNOWN rather than risk a second load.
+    let found: FundsResult | null = null;
+    if (funding.attempts > 1) {
+      try {
+        found = await this.nymcard.findFundsOperation(funding.card.nymcardCardId, issuerKey);
+      } catch (err) {
+        await this.prisma.cardFunding.updateMany({
+          where: { id: funding.id, status: { in: [...OPEN_OPERATION] } },
+          data: { status: 'UNKNOWN', lastError: `lookup failed: ${errorText(err)}` },
+        });
+        if (funding.attempts === UNRESOLVED_AFTER_ATTEMPTS) {
+          await this.prisma.suspiciousActivityFlag.create({
+            data: {
+              userId: funding.userId,
+              cardId: funding.cardId,
+              rule: 'FUNDING_UNRESOLVED',
+              details: { fundingId: funding.id, amountFils: funding.amountFils },
+            },
+          });
+        }
+        throw new ServiceUnavailableException({
+          code: 'CARD_FUNDING_PENDING',
+          fundingId: funding.id,
+        });
       }
-      await this.prisma.cardFunding.updateMany({
-        where: { id: funding.id, status: { in: [...OPEN_OPERATION] } },
-        data: { status: 'UNKNOWN', lastError: errorText(err) },
-      });
-      this.logger.warn(`Card load outcome unknown for funding ${funding.id}; will retry`);
-      throw new ServiceUnavailableException({
-        code: 'CARD_FUNDING_PENDING',
-        fundingId: funding.id,
-      });
+    }
+
+    let result: FundsResult;
+    if (found) {
+      result = found;
+    } else {
+      try {
+        result = await this.nymcard.loadFunds(
+          funding.card.nymcardCardId,
+          funding.amountFils,
+          issuerKey,
+        );
+      } catch (err) {
+        if (err instanceof IssuerRejectedError) {
+          await this.failFunding(funding.id, errorText(err));
+          throw err;
+        }
+        await this.prisma.cardFunding.updateMany({
+          where: { id: funding.id, status: { in: [...OPEN_OPERATION] } },
+          data: { status: 'UNKNOWN', lastError: errorText(err) },
+        });
+        this.logger.warn(`Card load outcome unknown for funding ${funding.id}; will retry`);
+        throw new ServiceUnavailableException({
+          code: 'CARD_FUNDING_PENDING',
+          fundingId: funding.id,
+        });
+      }
     }
 
     const claimed = await this.prisma.cardFunding.updateMany({
@@ -539,7 +578,9 @@ export class CardsService {
     }
 
     // Display-only cache; deliberately outside anything that could trigger compensation.
+    // (A lookup result may not carry a balance.)
     try {
+      if (!Number.isFinite(result.balanceFils)) throw new Error('no balance in issuer response');
       await this.prisma.card.update({
         where: { id: funding.cardId },
         data: { availableBalanceFils: result.balanceFils, balanceAsOf: new Date() },
@@ -687,7 +728,7 @@ export class CardsService {
         const amount = c.sweepFils ?? 0;
         let unloadRef: string | null = null;
         if (amount > 0) {
-          unloadRef = await this.unloadForCancellation(card, amount);
+          unloadRef = await this.unloadForCancellation(card, amount, c.attempts > 1);
         }
         await this.prisma.$transaction(async (tx) => {
           const claimed = await tx.cardCancellation.updateMany({
@@ -798,10 +839,18 @@ export class CardsService {
    * returns the original result). If the issuer refuses unloads on frozen cards, the card is
    * briefly reactivated for the sweep.
    */
-  private async unloadForCancellation(card: Card, amount: number) {
+  private async unloadForCancellation(card: Card, amount: number, resumed: boolean) {
     // The key includes the amount: a stable key for a retry of the same sweep, and a fresh one
     // if the balance had to be re-read.
     const key = `cancel-sweep-${card.id}-${amount}`;
+    if (resumed) {
+      // An earlier attempt may have unloaded already: check before sending anything again.
+      // A failed lookup throws, leaving the cancellation SWEEPING for a later retry.
+      for (const ref of [key, `${key}-active`]) {
+        const done = await this.nymcard.findFundsOperation(card.nymcardCardId, ref);
+        if (done) return done.providerRef;
+      }
+    }
     try {
       return (await this.nymcard.unloadFunds(card.nymcardCardId, amount, key)).providerRef;
     } catch (err) {

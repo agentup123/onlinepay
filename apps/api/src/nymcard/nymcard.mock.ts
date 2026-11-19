@@ -128,6 +128,13 @@ export class NymCardMockClient implements NymCardClient {
     return result;
   }
 
+  async findFundsOperation(_cardId: string, reference: string): Promise<FundsResult | null> {
+    const seen = await this.redis.get(`mock:nymcard:funds:${reference}`);
+    if (!seen) return null;
+    const prior = JSON.parse(seen) as FundsResult | { rejected: string };
+    return 'rejected' in prior ? null : prior;
+  }
+
   async createSecureDisplaySession(cardId: string): Promise<SecureDisplaySession> {
     await this.getCard(cardId);
     // Points at a dev-only page that renders a FAKE card number.

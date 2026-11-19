@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addVat } from './vat';
+import { addVat, CARDS_30_PRICE_EXCL_VAT_FILS } from './vat';
 import { parseAedToFils } from './money';
 import { canPerform, nextStatus } from './card-state';
 import { computeQuota } from './bundle';
@@ -132,5 +132,16 @@ describe('KYC age check', () => {
       kycSubmitSchema.safeParse({ ...base, dateOfBirth: minor.toISOString().slice(0, 10) }).success,
     ).toBe(false);
     expect(kycSubmitSchema.safeParse({ ...base, dateOfBirth: '1990-02-30' }).success).toBe(false);
+  });
+});
+
+describe('30-card bundle price', () => {
+  it('is exactly 30.00 AED including VAT', () => {
+    expect(addVat(CARDS_30_PRICE_EXCL_VAT_FILS)).toEqual({
+      subtotalFils: 2857,
+      vatFils: 143,
+      totalFils: 3000,
+      vatRateBps: 500,
+    });
   });
 });

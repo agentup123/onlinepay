@@ -98,6 +98,13 @@ export interface NymCardClient {
   setSpendingLimit(cardId: string, limitFils: number | null): Promise<void>;
   loadFunds(cardId: string, amountFils: number, idempotencyKey: string): Promise<FundsResult>;
   unloadFunds(cardId: string, amountFils: number, idempotencyKey: string): Promise<FundsResult>;
+  /**
+   * Looks up a load/unload we sent earlier, by the reference we attached to it (the same value as
+   * its idempotency key). Returns null when the issuer has no record of it — i.e. it was never
+   * applied and is safe to send again. Used before retrying an operation whose outcome is
+   * unknown, so correctness does not depend on the issuer's idempotency handling alone.
+   */
+  findFundsOperation(cardId: string, reference: string): Promise<FundsResult | null>;
   createSecureDisplaySession(cardId: string): Promise<SecureDisplaySession>;
   listTransactions(cardId: string, since?: Date): Promise<IssuerTransaction[]>;
 }

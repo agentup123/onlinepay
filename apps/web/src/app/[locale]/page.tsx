@@ -1,15 +1,15 @@
 import { useTranslations } from 'next-intl';
 import { setRequestLocale } from 'next-intl/server';
 import { use } from 'react';
-import { addVat, formatFils } from '@onlinepay/shared';
+import { addVat, CARDS_30_PRICE_EXCL_VAT_FILS, formatFils } from '@onlinepay/shared';
 import { Link } from '@/i18n/routing';
 
 export default function Landing({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = use(params);
   setRequestLocale(locale);
   const t = useTranslations('landing');
-  // UAE consumer pricing is shown VAT-inclusive; the VAT-exclusive price is secondary.
-  const price = addVat(3000);
+  // UAE consumer pricing is shown VAT-inclusive: 30.00 AED all-in (DECISIONS D12).
+  const price = addVat(CARDS_30_PRICE_EXCL_VAT_FILS);
   const fmt = (fils: number) => formatFils(fils, locale as 'en' | 'ar');
 
   return (

@@ -105,6 +105,12 @@ enum KycStatus {
   NEEDS_INFO
 }
 
+enum ScreeningStatus {
+  CLEAR
+  POTENTIAL_MATCH
+  ERROR
+}
+
 enum KycDocumentType {
   EMIRATES_ID
   PASSPORT
@@ -123,11 +129,16 @@ model KycApplication {
   reviewNote         String?
   reviewedByAdminId  String?
   reviewedAt         DateTime?
+  screeningStatus    ScreeningStatus? // sanctions / PEP screening result
+  screeningRef       String?          // screening vendor's case id
+  screeningSummary   String?
+  screenedAt         DateTime?
   createdAt          DateTime        @default(now())
   updatedAt          DateTime        @updatedAt
 
   @@unique([provider, providerRef])
   @@index([status])
+  @@index([status, screenedAt])
 }
 
 // ───────────────────────────── Bundles, purchases, invoices ─────────────────────────────

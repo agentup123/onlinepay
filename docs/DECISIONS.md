@@ -62,8 +62,12 @@ issuer/gateway idempotency key derived from that row's id. Outcomes:
   client's retry with the same `Idempotency-Key`, or the worker's `resume-operations` job (every
   5 minutes), repeats the call with the same issuer key.
 
-This relies on NymCard and Checkout.com replaying the original outcome for a repeated idempotency
-key (see NYMCARD_INTEGRATION.md item 4/8). If a load ever succeeds after we marked it `FAILED`, a
+Before resending a NymCard load/unload that may already have happened (any attempt after the
+first), the worker looks it up by the reference we attach to every load/unload
+(`findFundsOperation`). Found → recorded as done; not found → resent with the same key; lookup
+failed → stays `UNKNOWN` (never resent blind), with a `FUNDING_UNRESOLVED` flag after 10 tries.
+So correctness no longer depends on NymCard's idempotency handling alone; the gateway still relies
+on Checkout.com's idempotency keys. If a load ever succeeds after we marked it `FAILED`, a
 `FUNDING_INCONSISTENT` flag is raised for ops instead of silently creating money.
 
 ## D10 — One lock per card
@@ -78,12 +82,13 @@ is in flight.
 (compliance) freeze — cancelling would sweep the frozen balance into the wallet. Suspending a user
 freezes all their cards as an admin freeze.
 
-## D12 — Prices shown VAT-inclusive
+## D12 — 30 cards for 30.00 AED, VAT included · Decided
 
-The landing page shows the VAT-inclusive total (AED 31.50) as the headline price, with the
-pre-VAT price (AED 30.00) underneath. The stored bundle price stays VAT-exclusive. **Founder
-decision still open:** if "30 cards for 30 AED" must be the all-in price, set the bundle's
-`priceFils` to 2857 (subtotal 28.57 + VAT 1.43 = 30.00).
+The customer pays exactly **30.00 AED all-in**. Bundle prices are stored VAT-exclusive, so
+`CARDS_30` is stored as 2857 fils (28.57 AED) + 143 fils VAT (1.43 AED) = 3000 fils. The constant
+lives in `packages/shared/src/vat.ts` (`CARDS_30_PRICE_EXCL_VAT_FILS`); migration
+`20261119160000_bundle_price_vat_inclusive` updates existing databases. Prices are always shown
+VAT-inclusive, with the VAT amount underneath.
 
 ## D13 — Stored-value limits
 

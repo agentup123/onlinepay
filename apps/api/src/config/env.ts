@@ -50,8 +50,15 @@ const schema = z.object({
 
   KYC_PROVIDER: z.enum(['mock']).default('mock'),
   KYC_MOCK_AUTO_APPROVE: bool,
+  // Sanctions / PEP screening. Add the vendor's value when it is integrated.
+  SCREENING_PROVIDER: z.enum(['mock']).default('mock'),
 
-  SMS_PROVIDER: z.enum(['console']).default('console'),
+  SMS_PROVIDER: z.enum(['console', 'twilio']).default('console'),
+  TWILIO_ACCOUNT_SID: z.string().optional(),
+  TWILIO_AUTH_TOKEN: z.string().optional(),
+  // TDRA-registered alphanumeric sender ID, or a Messaging Service that uses one.
+  TWILIO_SENDER_ID: z.string().max(11).optional(),
+  TWILIO_MESSAGING_SERVICE_SID: z.string().optional(),
   SMTP_HOST: z.string().default('localhost'),
   SMTP_PORT: z.coerce.number().default(1025),
   SMTP_FROM: z.string().default('OnlinePay <no-reply@onlinepay.local>'),
@@ -93,11 +100,25 @@ function load(): Env {
     if (
       env.NYMCARD_MODE === 'mock' ||
       env.PAYMENT_GATEWAY === 'mock' ||
-      env.KYC_PROVIDER === 'mock'
+      env.KYC_PROVIDER === 'mock' ||
+      env.SCREENING_PROVIDER === 'mock'
     ) {
       throw new Error('Mock providers are not allowed in production');
     }
     if (!env.COOKIE_SECURE) throw new Error('COOKIE_SECURE must be true in production');
+    if (env.SMS_PROVIDER === 'console') {
+      throw new Error('SMS_PROVIDER=console is not allowed in production (use twilio)');
+    }
+  }
+  if (env.SMS_PROVIDER === 'twilio') {
+    if (!env.TWILIO_ACCOUNT_SID || !env.TWILIO_AUTH_TOKEN) {
+      throw new Error('SMS_PROVIDER=twilio requires TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN');
+    }
+    if (!env.TWILIO_SENDER_ID && !env.TWILIO_MESSAGING_SERVICE_SID) {
+      throw new Error(
+        'SMS_PROVIDER=twilio requires TWILIO_SENDER_ID or TWILIO_MESSAGING_SERVICE_SID',
+      );
+    }
   }
   return env;
 }

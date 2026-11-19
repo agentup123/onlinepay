@@ -112,7 +112,7 @@ export default function UserDetail({ params }: { params: Promise<{ id: string }>
                 tone="danger"
                 onClick={() => {
                   const amount = window.prompt(
-                    'Refund amount in fils (e.g. 3150 = 31.50 AED)',
+                    'Refund amount in fils (e.g. 3000 = 30.00 AED)',
                     String(p.totalFils),
                   );
                   if (amount)

@@ -167,7 +167,7 @@ export class NymCardHttpClient implements NymCardClient {
     const res = await this.request<{ id: string; available_balance: number }>(
       'POST',
       `/v1/cards/${cardId}/load`,
-      { amount: amountFils, currency: 'AED' },
+      { amount: amountFils, currency: 'AED', reference: idempotencyKey },
       idempotencyKey,
     );
     return { providerRef: res.id, balanceFils: res.available_balance };
@@ -181,10 +181,24 @@ export class NymCardHttpClient implements NymCardClient {
     const res = await this.request<{ id: string; available_balance: number }>(
       'POST',
       `/v1/cards/${cardId}/unload`,
-      { amount: amountFils, currency: 'AED' },
+      { amount: amountFils, currency: 'AED', reference: idempotencyKey },
       idempotencyKey,
     );
     return { providerRef: res.id, balanceFils: res.available_balance };
+  }
+
+  async findFundsOperation(cardId: string, reference: string): Promise<FundsResult | null> {
+    // TODO(nymcard-docs): confirm how to look up a load/unload by our reference (filter on the
+    // card's transfer history, or a dedicated endpoint) and which statuses mean "applied".
+    const res = await this.request<{ data: Record<string, unknown>[] }>(
+      'GET',
+      `/v1/cards/${cardId}/transfers?reference=${encodeURIComponent(reference)}`,
+    );
+    const op = res.data.find(
+      (t) => t.reference === reference && String(t.status ?? '').toUpperCase() !== 'FAILED',
+    );
+    if (!op) return null;
+    return { providerRef: String(op.id), balanceFils: Number(op.available_balance ?? NaN) };
   }
 
   async createSecureDisplaySession(cardId: string): Promise<SecureDisplaySession> {

@@ -2,11 +2,11 @@
 
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { addVat } from '@onlinepay/shared';
+import { addVat, CARDS_30_PRICE_EXCL_VAT_FILS } from '@onlinepay/shared';
 import { api, newIdempotencyKey } from '@/lib/api';
 import { ErrorText, Money } from '@/components/ui';
 
-const BUNDLE_PRICE_FILS = 3000;
+const BUNDLE_PRICE_FILS = CARDS_30_PRICE_EXCL_VAT_FILS; // 30.00 AED incl. VAT
 
 export default function CheckoutPage() {
   const t = useTranslations('checkout');

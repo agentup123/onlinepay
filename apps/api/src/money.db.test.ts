@@ -40,6 +40,10 @@ type Mode = 'ok' | 'reject' | 'timeout-before' | 'timeout-after';
 class FakeIssuer implements NymCardClient {
   cards = new Map<string, IssuerCard>();
   outcomes = new Map<string, FundsResult | { rejected: string } | IssuerCard>();
+  /** Every load/unload actually applied, by reference — what findFundsOperation searches. */
+  applied = new Map<string, FundsResult>();
+  /** false = a misbehaving issuer that re-executes repeated idempotency keys. */
+  idempotent = true;
   next: Mode[] = [];
 
   private mode(): Mode {
@@ -92,8 +96,12 @@ class FakeIssuer implements NymCardClient {
     return this.adjust(id, -amount, key);
   }
 
+  async findFundsOperation(_id: string, reference: string) {
+    return this.applied.get(reference) ?? null;
+  }
+
   private async adjust(id: string, delta: number, key: string): Promise<FundsResult> {
-    const prior = this.outcomes.get(key);
+    const prior = this.idempotent ? this.outcomes.get(key) : undefined;
     if (prior && 'rejected' in prior) throw new IssuerRejectedError(prior.rejected, 422);
     if (prior) return prior as FundsResult;
     const mode = this.mode();
@@ -106,6 +114,7 @@ class FakeIssuer implements NymCardClient {
     card.balanceFils += delta;
     const result = { providerRef: `ref-${randomUUID()}`, balanceFils: card.balanceFils };
     this.outcomes.set(key, result);
+    this.applied.set(key, result);
     if (mode === 'timeout-after') throw new IssuerUnavailableError('timeout');
     return result;
   }
@@ -268,6 +277,43 @@ describe.skipIf(!RUN)('money paths (Postgres)', () => {
     );
     expect((await issuer.getCard(card.nymcardCardId)).balanceFils).toBe(2_500);
     expect(await balance(user.id)).toBe(7_500);
+  });
+
+  it('even an issuer that ignores idempotency keys is never loaded twice', async () => {
+    const user = await newUser(10_000);
+    const card = await newCard(user.id);
+    issuer.idempotent = false;
+    issuer.next = ['timeout-after'];
+    await expect(cards.fund(user.id, card.id, 2_000, 'key-B2', meta)).rejects.toMatchObject({
+      response: { code: 'CARD_FUNDING_PENDING' },
+    });
+    // Resume (client retry and worker) looks the load up by reference instead of resending it.
+    await cards.fund(user.id, card.id, 2_000, 'key-B2', meta);
+    const funding = await prisma.cardFunding.findFirstOrThrow({ where: { cardId: card.id } });
+    await cards.executeFunding(funding.id);
+    expect((await issuer.getCard(card.nymcardCardId)).balanceFils).toBe(2_000);
+    expect(await balance(user.id)).toBe(8_000);
+  });
+
+  it('a failed lookup leaves the funding pending instead of resending', async () => {
+    const user = await newUser(10_000);
+    const card = await newCard(user.id);
+    issuer.next = ['timeout-before'];
+    await expect(cards.fund(user.id, card.id, 1_000, 'key-B3', meta)).rejects.toBeTruthy();
+    const lookup = issuer.findFundsOperation.bind(issuer);
+    issuer.findFundsOperation = async () => {
+      throw new IssuerUnavailableError('lookup down');
+    };
+    await expect(cards.fund(user.id, card.id, 1_000, 'key-B3', meta)).rejects.toMatchObject({
+      response: { code: 'CARD_FUNDING_PENDING' },
+    });
+    expect((await issuer.getCard(card.nymcardCardId)).balanceFils).toBe(0);
+    issuer.findFundsOperation = lookup;
+    await expect(cards.fund(user.id, card.id, 1_000, 'key-B3', meta)).resolves.toMatchObject({
+      status: 'SUCCEEDED',
+    });
+    expect((await issuer.getCard(card.nymcardCardId)).balanceFils).toBe(1_000);
+    expect(await balance(user.id)).toBe(9_000);
   });
 
   it('a client retry after a timeout before the load loads exactly once', async () => {
