@@ -3,8 +3,8 @@
 #   - installs dependencies (creates pnpm-lock.yaml)
 #   - starts Postgres/Redis/Mailpit
 #   - creates the initial Prisma migration and seeds demo data
-#   - runs typecheck + unit tests
-#   - commits the lockfile and initial migration (push with --push)
+#   - formats, lints, typechecks and runs unit tests
+#   - commits the lockfile, initial migration and any formatting fixes (push with --push)
 #
 # Usage: ./scripts/setup.sh [--push]
 set -euo pipefail
@@ -39,12 +39,14 @@ pnpm --filter @onlinepay/shared build
 pnpm --filter @onlinepay/db build
 pnpm db:seed
 
+pnpm format
+pnpm lint
 pnpm typecheck
 pnpm test
 
-git add pnpm-lock.yaml packages/db/prisma/migrations 2>/dev/null || true
+git add -A   # lockfile, initial migration, formatting fixes (.env is git-ignored)
 if ! git diff --cached --quiet; then
-  git commit -m "chore: add lockfile and initial database migration"
+  git commit -m "chore: add lockfile, initial database migration and formatting"
   if [ "${1:-}" = "--push" ]; then git push; fi
 fi
 
