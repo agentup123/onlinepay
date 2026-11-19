@@ -22,27 +22,49 @@ export class AuthService {
    * one by email and one by SMS. Both must be verified to activate the account.
    */
   async startSignup(input: SignupStartInput) {
-    const existing = await this.prisma.user.findFirst({
+    const matches = await this.prisma.user.findMany({
       where: { OR: [{ email: input.email }, { phone: input.phone }] },
     });
-    if (existing && existing.status !== 'PENDING_VERIFICATION') {
-      throw new ConflictException({ code: 'ACCOUNT_EXISTS' });
-    }
-    if (existing && (existing.email !== input.email || existing.phone !== input.phone)) {
+    if (matches.some((u) => u.status !== 'PENDING_VERIFICATION')) {
       throw new ConflictException({ code: 'ACCOUNT_EXISTS' });
     }
 
-    const user =
-      existing ??
-      (await this.prisma.user.create({
-        data: {
-          fullName: input.fullName,
-          email: input.email,
-          phone: input.phone,
-          locale: input.locale,
-          termsAcceptedAt: new Date(),
-        },
-      }));
+    // Unverified sign-ups own nothing until both OTPs are verified. If someone started a sign-up
+    // with this email or phone but a different counterpart (e.g. a squatter pairing the victim's
+    // email with their own phone), release it rather than locking the real owner out. The row is
+    // closed (not deleted) so its OTP history still counts towards per-destination rate limits.
+    const exact = matches.find((u) => u.email === input.email && u.phone === input.phone);
+    for (const stale of matches.filter((u) => u !== exact)) {
+      await this.prisma.$transaction([
+        this.prisma.user.updateMany({
+          where: { id: stale.id, status: 'PENDING_VERIFICATION' },
+          data: {
+            status: 'CLOSED',
+            email: `released+${stale.id}@invalid.onlinepay`,
+            phone: `released:${stale.id}`,
+          },
+        }),
+        this.prisma.otpChallenge.updateMany({
+          where: { userId: stale.id, consumedAt: null },
+          data: { consumedAt: new Date() },
+        }),
+      ]);
+    }
+
+    const user = exact
+      ? await this.prisma.user.update({
+          where: { id: exact.id },
+          data: { fullName: input.fullName, locale: input.locale, termsAcceptedAt: new Date() },
+        })
+      : await this.prisma.user.create({
+          data: {
+            fullName: input.fullName,
+            email: input.email,
+            phone: input.phone,
+            locale: input.locale,
+            termsAcceptedAt: new Date(),
+          },
+        });
 
     const emailChallengeId = await this.otp.issue(user.id, 'SIGNUP_EMAIL', 'EMAIL', user.email);
     const phoneChallengeId = await this.otp.issue(user.id, 'SIGNUP_PHONE', 'SMS', user.phone);
@@ -71,10 +93,12 @@ export class AuthService {
     if (emailUserId !== phoneUserId) throw new BadRequestException({ code: 'OTP_INVALID' });
 
     const now = new Date();
-    const user = await this.prisma.user.update({
-      where: { id: emailUserId },
+    const activated = await this.prisma.user.updateMany({
+      where: { id: emailUserId, status: 'PENDING_VERIFICATION' },
       data: { emailVerifiedAt: now, phoneVerifiedAt: now, status: 'ACTIVE' },
     });
+    if (activated.count !== 1) throw new BadRequestException({ code: 'OTP_INVALID' });
+    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: emailUserId } });
     await this.prisma.wallet.upsert({
       where: { userId: user.id },
       update: {},

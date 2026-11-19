@@ -56,6 +56,15 @@ const schema = z.object({
   SMTP_PORT: z.coerce.number().default(1025),
   SMTP_FROM: z.string().default('OnlinePay <no-reply@onlinepay.local>'),
 
+  // Stored-value limits (AML). Agree final values with your MLRO and NymCard.
+  WALLET_MAX_BALANCE_FILS: z.coerce.number().int().positive().default(1_500_000),
+  WALLET_TOPUP_30D_LIMIT_FILS: z.coerce.number().int().positive().default(3_000_000),
+
+  // Number of reverse proxies in front of the API (Next.js rewrite + load balancer). The client
+  // IP used for rate limiting is taken from X-Forwarded-For accordingly. Never expose the API
+  // port directly when this is > 0.
+  TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(5).default(1),
+
   MONITOR_HIGH_AMOUNT_FILS: z.coerce.number().int().default(500000),
   MONITOR_VELOCITY_COUNT: z.coerce.number().int().default(5),
   MONITOR_DECLINE_COUNT: z.coerce.number().int().default(3),

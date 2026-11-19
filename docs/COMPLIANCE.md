@@ -21,9 +21,14 @@
 - Identity verification (Emirates ID / passport) is required before buying or issuing cards.
   Document images stay with the KYC provider; we store only status, provider reference,
   document type, nationality and date of birth.
+- Age 18+ is enforced on the KYC form/API. Only the **latest** KYC application counts, so
+  compliance can revoke an approval (REJECTED / NEEDS_INFO); suspend the user as well to freeze
+  existing cards.
+- Stored-value limits on the wallet (DECISIONS D13) and a `HIGH_TOPUP` monitoring flag.
 - **⚖ needs review:** which KYC provider satisfies NymCard's onboarding rules; sanctions/PEP
-  screening (at onboarding and ongoing); risk-rating; age 18+ enforcement; re-verification
-  when documents expire.
+  screening (at onboarding and ongoing) — the KYC provider adapter needs a screening hook once a
+  vendor is chosen; risk-rating; re-verification when documents expire; date of birth and
+  nationality should come from the provider's document extraction, not user input.
 - Transaction monitoring rules (`apps/api/src/monitoring/monitoring.rules.ts`): high amount,
   velocity, decline bursts, risky MCCs. Thresholds are placeholders — agree them with your
   **MLRO**. Escalated flags may need a Suspicious Transaction Report via **goAML** (UAE FIU).
@@ -55,19 +60,19 @@
 
 ## Application security controls in this codebase
 
-| Control                                                                                   | Where                                         |
-| ----------------------------------------------------------------------------------------- | --------------------------------------------- |
-| Passwordless OTP auth, hashed OTPs (HMAC + pepper), 5-min expiry, 5 attempts, send limits | `auth/otp.service.ts`                         |
-| Opaque session tokens stored as SHA-256, httpOnly + SameSite cookies, revocation          | `auth/`                                       |
-| Admin: bcrypt password + TOTP, 8-hour sessions, SameSite=Strict, role-based access        | `admin/admin-auth.ts`                         |
-| CSRF: Origin/Referer check on all mutating cookie routes                                  | `common/origin.middleware.ts`                 |
-| Rate limiting (global + stricter on auth/card actions)                                    | `@nestjs/throttler`                           |
-| Idempotency keys on purchases, card create/fund/cancel                                    | `common/idempotency.interceptor.ts`           |
-| Atomic wallet ledger, never negative, idempotent entries                                  | `wallet/wallet.service.ts`                    |
-| Per-user advisory lock prevents exceeding bundle quota under concurrency                  | `cards/cards.service.ts`                      |
-| Signed, idempotent webhooks; amount check before granting value                           | `webhooks/`, `payments/payments.service.ts`   |
-| Audit log for every card, money, KYC and admin action                                     | `common/audit.service.ts`                     |
-| Security headers (helmet, CSP, HSTS), mock providers blocked in production                | `main.ts`, `next.config.mjs`, `config/env.ts` |
+| Control                                                                                                                                        | Where                                                         |
+| ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| Passwordless OTP auth, hashed OTPs (HMAC + pepper), 5-min expiry, 5 attempts (claimed atomically), send limits per account and per destination | `auth/otp.service.ts`                                         |
+| Opaque session tokens stored as SHA-256, httpOnly + SameSite cookies, revocation                                                               | `auth/`                                                       |
+| Admin: bcrypt password + TOTP (single-use codes), lockout after 5 failures, 8-hour sessions, SameSite=Strict, role-based access                | `admin/admin-auth.ts`                                         |
+| CSRF: Origin/Referer check on all mutating cookie routes; `/admin` only from the admin origin; consumer site does not proxy `/api/admin`       | `common/origin.middleware.ts`, `web/next.config.mjs`          |
+| Rate limiting (global + stricter on auth/card actions)                                                                                         | `@nestjs/throttler`                                           |
+| Idempotency keys on purchases, card create/fund/cancel, admin refunds; money operations persisted before external calls (DECISIONS D9)         | `common/idempotency.interceptor.ts`, `cards/cards.service.ts` |
+| Atomic wallet ledger, never negative, idempotent entries                                                                                       | `wallet/wallet.service.ts`                                    |
+| Per-user advisory lock prevents exceeding bundle quota under concurrency                                                                       | `cards/cards.service.ts`                                      |
+| Signed, idempotent webhooks; amount check before granting value                                                                                | `webhooks/`, `payments/payments.service.ts`                   |
+| Audit log for every card, money, KYC and admin action                                                                                          | `common/audit.service.ts`                                     |
+| Security headers (helmet, CSP, HSTS), mock providers blocked in production                                                                     | `main.ts`, `next.config.mjs`, `config/env.ts`                 |
 
 ## Before production
 
@@ -77,3 +82,6 @@
 - [ ] Centralised logging with retention, alerting on webhook failures and flag spikes
 - [ ] Backups and restore drill; incident response and breach notification runbook
 - [ ] Real SMS provider with a TDRA-registered sender ID
+- [ ] Real KYC provider adapter (`KYC_PROVIDER` only offers `mock`, which production refuses — the
+      API will not boot in production until one is added)
+- [ ] Set `TRUST_PROXY_HOPS` to the real number of proxies and keep the API port private

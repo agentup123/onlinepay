@@ -60,8 +60,10 @@ describe('parseNymCardEvent', () => {
 });
 
 describe('WebhooksService idempotency', () => {
-  function setup(createImpl: () => Promise<unknown>) {
-    const prisma = { webhookEvent: { create: vi.fn(createImpl) } };
+  function setup(createImpl: () => Promise<unknown>, existing: unknown = null) {
+    const prisma = {
+      webhookEvent: { create: vi.fn(createImpl), findUnique: vi.fn(async () => existing) },
+    };
     const queue = { add: vi.fn(async () => undefined) };
     const queues = { nymcardEvents: queue, paymentEvents: queue };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -86,14 +88,19 @@ describe('WebhooksService idempotency', () => {
     );
   });
 
-  it('acknowledges duplicates without enqueuing again', async () => {
-    const dup = new Prisma.PrismaClientKnownRequestError('Unique constraint', {
+  const dup = () =>
+    new Prisma.PrismaClientKnownRequestError('Unique constraint', {
       code: 'P2002',
       clientVersion: 'test',
     });
-    const { service, queue } = setup(async () => {
-      throw dup;
-    });
+
+  it('acknowledges duplicates of processed events without enqueuing again', async () => {
+    const { service, queue } = setup(
+      async () => {
+        throw dup();
+      },
+      { id: 'row-1', provider: 'nymcard', eventType: 'x', processedAt: new Date() },
+    );
     const res = await service.ingest(
       'nymcard',
       'evt_1',
@@ -103,6 +110,49 @@ describe('WebhooksService idempotency', () => {
     );
     expect(res).toEqual({ duplicate: true });
     expect(queue.add).not.toHaveBeenCalled();
+  });
+
+  it('re-enqueues a redelivered event that was stored but never processed', async () => {
+    // e.g. the first delivery was stored, then Redis was down so it never reached the queue.
+    const { service, queue } = setup(
+      async () => {
+        throw dup();
+      },
+      { id: 'row-1', provider: 'nymcard', eventType: 'transaction.settlement', processedAt: null },
+    );
+    const res = await service.ingest(
+      'nymcard',
+      'evt_1',
+      'transaction.settlement',
+      Buffer.from('{}'),
+      {},
+    );
+    expect(res).toEqual({ duplicate: true });
+    expect(queue.add).toHaveBeenCalledWith(
+      'transaction.settlement',
+      { webhookEventId: 'row-1' },
+      expect.objectContaining({ jobId: expect.stringMatching(/^row-1:redeliver:/) }),
+    );
+  });
+
+  it('stores the normalised event next to the redacted payload', async () => {
+    const { service } = setup(async () => ({ id: 'row-2' }));
+    const prisma = (
+      service as unknown as { prisma: { webhookEvent: { create: ReturnType<typeof vi.fn> } } }
+    ).prisma;
+    const normalized = { kind: 'transaction', transactionId: '4111111111111111' };
+    await service.ingest(
+      'nymcard',
+      'evt_2',
+      'transaction.settlement',
+      Buffer.from('{}'),
+      { data: { transaction_id: '4111111111111111' } },
+      normalized,
+    );
+    const data = prisma.webhookEvent.create.mock.calls[0]![0].data;
+    // The audit copy is redacted, the processing copy keeps the identifier intact.
+    expect(JSON.stringify(data.payload)).not.toContain('4111111111111111');
+    expect(data.normalized).toEqual(normalized);
   });
 });
 

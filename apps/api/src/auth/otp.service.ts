@@ -17,10 +17,14 @@ export class OtpService {
   ) {}
 
   async issue(userId: string, purpose: OtpPurpose, channel: OtpChannel, destination: string) {
-    const recent = await this.prisma.otpChallenge.count({
-      where: { userId, createdAt: { gt: new Date(Date.now() - 60 * 60 * 1000) } },
-    });
-    if (recent >= MAX_SENDS_PER_HOUR) {
+    // Limit per account AND per destination: unverified sign-ups can be discarded and recreated,
+    // so a per-user limit alone would not stop code-spamming someone's phone or inbox.
+    const since = new Date(Date.now() - 60 * 60 * 1000);
+    const [recentForUser, recentForDestination] = await Promise.all([
+      this.prisma.otpChallenge.count({ where: { userId, createdAt: { gt: since } } }),
+      this.prisma.otpChallenge.count({ where: { destination, createdAt: { gt: since } } }),
+    ]);
+    if (recentForUser >= MAX_SENDS_PER_HOUR || recentForDestination >= MAX_SENDS_PER_HOUR) {
       throw new TooManyRequestsException({ code: 'OTP_RATE_LIMITED' });
     }
 
@@ -49,18 +53,20 @@ export class OtpService {
     const invalid = new BadRequestException({ code: 'OTP_INVALID' });
     if (!challenge || challenge.purpose !== purpose || challenge.consumedAt) throw invalid;
     if (challenge.expiresAt < new Date()) throw new BadRequestException({ code: 'OTP_EXPIRED' });
-    if (challenge.attempts >= challenge.maxAttempts) {
+
+    // Claim an attempt atomically BEFORE comparing, so parallel guesses cannot all slip past
+    // the limit between a read and an increment.
+    const attempt = await this.prisma.otpChallenge.updateMany({
+      where: { id: challengeId, consumedAt: null, attempts: { lt: challenge.maxAttempts } },
+      data: { attempts: { increment: 1 } },
+    });
+    if (attempt.count !== 1) {
       throw new TooManyRequestsException({ code: 'OTP_TOO_MANY_ATTEMPTS' });
     }
 
     const ok = safeEqualHex(hmacSha256(env.OTP_PEPPER, code), challenge.codeHash);
-    if (!ok) {
-      await this.prisma.otpChallenge.update({
-        where: { id: challengeId },
-        data: { attempts: { increment: 1 } },
-      });
-      throw invalid;
-    }
+    if (!ok) throw invalid;
+
     // Atomic consume: only one concurrent request can succeed.
     const consumed = await this.prisma.otpChallenge.updateMany({
       where: { id: challengeId, consumedAt: null },

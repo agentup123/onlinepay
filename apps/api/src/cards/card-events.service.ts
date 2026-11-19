@@ -9,6 +9,8 @@ import { env } from '../config/env';
 import { evaluateRules } from '../monitoring/monitoring.rules';
 import type { NymCardEvent } from '../nymcard/nymcard.types';
 
+const TERMINAL: CardTxnStatus[] = ['REVERSED', 'DECLINED'];
+
 const STATUS_BY_STAGE: Record<CardTxnType, CardTxnStatus> = {
   AUTHORIZATION: 'PENDING',
   SETTLEMENT: 'SETTLED',
@@ -41,13 +43,34 @@ export class CardEventsService {
 
     if (event.kind === 'card_status') {
       if (card.status === event.status || card.status === 'CANCELLED') return;
-      await this.prisma.card.update({
-        where: { id: card.id },
+      const occurredAt = new Date(event.occurredAt);
+      // Ignore events older than our latest known status change (out-of-order delivery).
+      if (occurredAt < card.statusChangedAt) return;
+      const updated = await this.prisma.card.updateMany({
+        where: { id: card.id, status: card.status },
         data: {
           status: event.status,
+          statusChangedAt: occurredAt,
+          // Issuer-side changes carry no OnlinePay actor; an admin freeze is kept as is.
+          frozenBy: event.status === 'FROZEN' ? card.frozenBy : null,
           cancelledAt: event.status === 'CANCELLED' ? new Date() : undefined,
         },
       });
+      if (updated.count !== 1) return; // changed concurrently; the newer state wins
+      if (event.status === 'CANCELLED' && card.availableBalanceFils > 0) {
+        const ours = await this.prisma.cardCancellation.findUnique({ where: { cardId: card.id } });
+        if (!ours) {
+          // Cancelled by the issuer, not by us: the balance was not swept to the wallet.
+          await this.prisma.suspiciousActivityFlag.create({
+            data: {
+              userId: card.userId,
+              cardId: card.id,
+              rule: 'ISSUER_CANCELLED_WITH_BALANCE',
+              details: { balanceFils: card.availableBalanceFils, eventId: event.eventId },
+            },
+          });
+        }
+      }
       await this.audit.log({
         actorType: 'SYSTEM',
         action: 'card.status_synced',
@@ -62,11 +85,16 @@ export class CardEventsService {
     // ── Transaction events ──
     const type = event.stage as CardTxnType;
     const status = STATUS_BY_STAGE[type];
-    const existing = await this.prisma.cardTransaction.findUnique({
-      where: { providerTxnId: event.transactionId },
-    });
-    // Do not move a settled/reversed transaction back to pending if events arrive out of order.
-    if (existing && existing.status !== 'PENDING' && status === 'PENDING') return;
+    // A merchant refund is a separate credit, not a new state of the original purchase.
+    const providerTxnId =
+      type === 'REFUND' ? `${event.transactionId}:refund:${event.eventId}` : event.transactionId;
+    const existing = await this.prisma.cardTransaction.findUnique({ where: { providerTxnId } });
+    // Out-of-order delivery: never move a transaction back to PENDING, and never change a
+    // terminal one (reversed/declined).
+    if (existing) {
+      if (TERMINAL.includes(existing.status)) return;
+      if (existing.status !== 'PENDING' && status === 'PENDING') return;
+    }
 
     const data = {
       type,
@@ -81,14 +109,19 @@ export class CardEventsService {
       occurredAt: new Date(event.occurredAt),
     };
     await this.prisma.cardTransaction.upsert({
-      where: { providerTxnId: event.transactionId },
+      where: { providerTxnId },
       update: data,
-      create: { ...data, cardId: card.id, providerTxnId: event.transactionId },
+      create: { ...data, cardId: card.id, providerTxnId },
     });
     if (event.availableBalanceFils !== undefined) {
-      await this.prisma.card.update({
-        where: { id: card.id },
-        data: { availableBalanceFils: event.availableBalanceFils },
+      // Only move the cached balance forward in time.
+      const asOf = new Date(event.occurredAt);
+      await this.prisma.card.updateMany({
+        where: {
+          id: card.id,
+          OR: [{ balanceAsOf: null }, { balanceAsOf: { lte: asOf } }],
+        },
+        data: { availableBalanceFils: event.availableBalanceFils, balanceAsOf: asOf },
       });
     }
 

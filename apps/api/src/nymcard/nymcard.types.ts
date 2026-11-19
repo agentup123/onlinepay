@@ -3,7 +3,47 @@
  * Implementations: NymCardMockClient (dev/test) and NymCardHttpClient (sandbox/production).
  * Amounts are integer fils (AED minor units).
  */
+import { ServiceUnavailableException, UnprocessableEntityException } from '@nestjs/common';
+
 export const NYMCARD_CLIENT = Symbol('NYMCARD_CLIENT');
+
+/**
+ * The issuer definitively rejected the request (validation error, card not active, insufficient
+ * balance, …). Nothing happened at the issuer, so it is safe to compensate (e.g. refund a wallet
+ * debit).
+ */
+export class IssuerRejectedError extends UnprocessableEntityException {
+  constructor(
+    readonly reason: string,
+    readonly httpStatus?: number,
+  ) {
+    super({ code: 'ISSUER_REJECTED', reason, status: httpStatus });
+  }
+}
+
+/**
+ * The outcome is unknown: timeout, network failure, 5xx, 409/429. The operation may or may not
+ * have been applied by the issuer. Never compensate on this error — retry with the same
+ * idempotency key or reconcile first.
+ */
+export class IssuerUnavailableError extends ServiceUnavailableException {
+  constructor(
+    readonly reason: string,
+    readonly httpStatus?: number,
+  ) {
+    super({ code: 'ISSUER_UNAVAILABLE', status: httpStatus });
+  }
+}
+
+/** HTTP statuses where the request may have been applied (or will be on retry). */
+const AMBIGUOUS_STATUSES = new Set([408, 409, 425, 429]);
+
+export function issuerErrorForStatus(status: number, context: string): Error {
+  if (status >= 400 && status < 500 && !AMBIGUOUS_STATUSES.has(status)) {
+    return new IssuerRejectedError(`${context} -> ${status}`, status);
+  }
+  return new IssuerUnavailableError(`${context} -> ${status}`, status);
+}
 
 export type IssuerCardStatus = 'ACTIVE' | 'FROZEN' | 'CANCELLED';
 

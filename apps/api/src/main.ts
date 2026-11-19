@@ -15,7 +15,8 @@ async function bootstrap() {
     logger: new RedactingLogger('API'),
   });
 
-  app.set('trust proxy', 1); // correct client IPs behind the web app proxy / load balancer
+  // Correct client IPs behind the web app proxy / load balancer (see TRUST_PROXY_HOPS).
+  app.set('trust proxy', env.TRUST_PROXY_HOPS);
   app.use(helmet());
   app.use(cookieParser());
   app.use(originCheck());

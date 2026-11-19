@@ -1,4 +1,3 @@
-import { NotFoundException } from '@nestjs/common';
 import type Redis from 'ioredis';
 import { randomUUID } from 'node:crypto';
 import { env } from '../config/env';
@@ -11,6 +10,7 @@ import type {
   NymCardClient,
   SecureDisplaySession,
 } from './nymcard.types';
+import { IssuerRejectedError } from './nymcard.types';
 
 /**
  * Deterministic NymCard stand-in for development and tests. State lives in Redis so the API
@@ -62,7 +62,7 @@ export class NymCardMockClient implements NymCardClient {
       await this.redis.set(this.key(cardId), JSON.stringify(card));
       return card;
     }
-    throw new NotFoundException('Mock card not found');
+    throw new IssuerRejectedError('Mock card not found', 404);
   }
 
   private async save(card: IssuerCard) {
@@ -71,7 +71,7 @@ export class NymCardMockClient implements NymCardClient {
 
   async setCardStatus(cardId: string, status: IssuerCardStatus) {
     const card = await this.getCard(cardId);
-    if (card.status === 'CANCELLED') throw new Error('Card already cancelled');
+    if (card.status === 'CANCELLED') throw new IssuerRejectedError('Card already cancelled', 422);
     card.status = status;
     await this.save(card);
   }
@@ -101,12 +101,26 @@ export class NymCardMockClient implements NymCardClient {
     delta: number,
     idempotencyKey: string,
   ): Promise<FundsResult> {
+    // Like a real issuer, the outcome (success OR rejection) is remembered per idempotency key,
+    // so a retry with the same key can never turn an earlier rejection into a success.
     const idemKey = `mock:nymcard:funds:${idempotencyKey}`;
     const seen = await this.redis.get(idemKey);
-    if (seen) return JSON.parse(seen) as FundsResult;
+    if (seen) {
+      const prior = JSON.parse(seen) as FundsResult | { rejected: string };
+      if ('rejected' in prior) throw new IssuerRejectedError(prior.rejected, 422);
+      return prior;
+    }
     const card = await this.getCard(cardId);
-    if (card.status !== 'ACTIVE' && delta > 0) throw new Error('Card not active');
-    if (card.balanceFils + delta < 0) throw new Error('Insufficient card balance');
+    const rejection =
+      card.status !== 'ACTIVE' && delta > 0
+        ? 'Card not active'
+        : card.balanceFils + delta < 0
+          ? 'Insufficient card balance'
+          : null;
+    if (rejection) {
+      await this.redis.set(idemKey, JSON.stringify({ rejected: rejection }), 'EX', 86400);
+      throw new IssuerRejectedError(rejection, 422);
+    }
     card.balanceFils += delta;
     await this.save(card);
     const result = { providerRef: `mock-funds-${randomUUID()}`, balanceFils: card.balanceFils };

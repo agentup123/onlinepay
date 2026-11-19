@@ -7,6 +7,8 @@ export interface BundleQuotaInput {
   cardStatuses: CardStatus[];
   /** Business rule: does a cancelled card still consume a slot? */
   cancelledCountsAgainstBundle: boolean;
+  /** Card issuances started but not finished yet (they hold a slot until they fail). */
+  pendingIssuances?: number;
 }
 
 export interface BundleQuota {
@@ -16,9 +18,9 @@ export interface BundleQuota {
 }
 
 export function computeQuota(input: BundleQuotaInput): BundleQuota {
-  const used = input.cardStatuses.filter(
-    (s) => input.cancelledCountsAgainstBundle || s !== 'CANCELLED',
-  ).length;
+  const used =
+    input.cardStatuses.filter((s) => input.cancelledCountsAgainstBundle || s !== 'CANCELLED')
+      .length + (input.pendingIssuances ?? 0);
   return {
     purchased: input.purchasedSlots,
     used,

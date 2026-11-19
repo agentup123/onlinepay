@@ -46,7 +46,7 @@ export class WebhooksController {
     const body = req.body as Record<string, unknown>;
     const parsed = parseNymCardEvent(body);
     const type = parsed.kind === 'unknown' ? parsed.type : String(body.type);
-    return this.webhooks.ingest('nymcard', parsed.eventId, type, raw, body);
+    return this.webhooks.ingest('nymcard', parsed.eventId, type, raw, body, parsed);
   }
 
   @Post('payments/checkoutcom')
@@ -64,6 +64,7 @@ export class WebhooksController {
       String(body.type ?? 'unknown'),
       raw,
       body,
+      this.gateway.parseWebhook(body),
     );
   }
 
@@ -83,6 +84,7 @@ export class WebhooksController {
       `mock.${body.outcome}`,
       raw,
       body,
+      this.gateway.parseWebhook(body),
     );
   }
 }

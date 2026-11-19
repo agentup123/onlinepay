@@ -1,6 +1,16 @@
-import { Logger, ServiceUnavailableException } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 import { hmacSha256, safeEqualHex } from '../common/crypto';
-import type { CheckoutSessionInput, GatewayEvent, PaymentGateway } from './gateway.types';
+import {
+  GatewayRejectedError,
+  GatewayUnavailableError,
+  type CheckoutSessionInput,
+  type GatewayEvent,
+  type PaymentGateway,
+} from './gateway.types';
+
+const TIMEOUT_MS = 15_000;
+/** Statuses where the request may still have been applied. */
+const AMBIGUOUS_STATUSES = new Set([408, 409, 425, 429]);
 
 export interface CheckoutComConfig {
   baseUrl: string;
@@ -26,20 +36,40 @@ export class CheckoutComGateway implements PaymentGateway {
   }
 
   private async post<T>(path: string, body: unknown, idempotencyKey: string): Promise<T> {
-    const res = await fetch(new URL(path, this.cfg.baseUrl), {
-      method: 'POST',
-      headers: {
-        authorization: `Bearer ${this.cfg.secretKey}`,
-        'content-type': 'application/json',
-        'cko-idempotency-key': idempotencyKey,
-      },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) {
-      this.logger.warn(`Checkout.com POST ${path} -> ${res.status}`);
-      throw new ServiceUnavailableException({ code: 'PAYMENT_GATEWAY_ERROR' });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+    let res: Response;
+    try {
+      res = await fetch(new URL(path, this.cfg.baseUrl), {
+        method: 'POST',
+        signal: controller.signal,
+        headers: {
+          authorization: `Bearer ${this.cfg.secretKey}`,
+          'content-type': 'application/json',
+          'cko-idempotency-key': idempotencyKey,
+        },
+        body: JSON.stringify(body),
+      });
+    } catch (err) {
+      clearTimeout(timer);
+      this.logger.warn(`Checkout.com POST ${path} failed: ${(err as Error).name}`);
+      throw new GatewayUnavailableError(`POST ${path}: ${(err as Error).name}`);
     }
-    return (await res.json()) as T;
+    try {
+      if (!res.ok) {
+        this.logger.warn(`Checkout.com POST ${path} -> ${res.status}`);
+        if (res.status >= 400 && res.status < 500 && !AMBIGUOUS_STATUSES.has(res.status)) {
+          throw new GatewayRejectedError(`POST ${path} -> ${res.status}`);
+        }
+        throw new GatewayUnavailableError(`POST ${path} -> ${res.status}`);
+      }
+      return (await res.json()) as T;
+    } catch (err) {
+      if (err instanceof GatewayRejectedError || err instanceof GatewayUnavailableError) throw err;
+      throw new GatewayUnavailableError(`POST ${path}: unreadable response`);
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   async createCheckoutSession(input: CheckoutSessionInput) {
@@ -83,6 +113,7 @@ export class CheckoutComGateway implements PaymentGateway {
           paymentId,
           reference,
           amountFils: Number(data.amount ?? 0),
+          currency: typeof data.currency === 'string' ? data.currency : undefined,
         };
       case 'payment_declined':
       case 'payment_capture_declined':

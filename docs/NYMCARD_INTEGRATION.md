@@ -15,22 +15,25 @@ only touches `nymcard.http.ts` and `nymcard.webhook.ts`.
 None of the HTTP details below have been checked against the real API. Fill them in from
 NymCard's sandbox documentation / your onboarding pack:
 
-| #   | Item                                                                           | Where                                                         |
-| --- | ------------------------------------------------------------------------------ | ------------------------------------------------------------- |
-| 1   | Base URLs (sandbox, production)                                                | `.env` `NYMCARD_BASE_URL`                                     |
-| 2   | Auth scheme (API key header vs OAuth client-credentials + token refresh)       | `NymCardHttpClient.request`                                   |
-| 3   | Create cardholder endpoint + required KYC fields                               | `createCardholder`                                            |
-| 4   | Issue virtual card endpoint, product id, idempotency support                   | `createVirtualCard`                                           |
-| 5   | Card object fields (`last4`, expiry, status values, balance)                   | `mapCard`                                                     |
-| 6   | Status change endpoint and status names (freeze/unfreeze/terminate)            | `setCardStatus`                                               |
-| 7   | Spending-limit / velocity-control endpoint                                     | `setSpendingLimit`                                            |
-| 8   | Load / unload funds endpoints (or account-to-card transfers)                   | `loadFunds`, `unloadFunds`                                    |
-| 9   | **Secure card display** (iframe/SDK URL or token) and its origin for CSP       | `createSecureDisplaySession`, `NYMCARD_SECURE_DISPLAY_ORIGIN` |
-| 10  | Transactions list endpoint + pagination                                        | `listTransactions`                                            |
-| 11  | Webhook signature header, algorithm, timestamp/replay protection               | `verifyNymCardSignature`, `NYMCARD_WEBHOOK_SIGNATURE_HEADER`  |
-| 12  | Webhook event names and payload fields                                         | `parseNymCardEvent`                                           |
-| 13  | Error codes worth mapping to user messages (insufficient funds, card blocked…) | `NymCardHttpClient.request`                                   |
-| 14  | IP allow-listing of our egress IPs / their webhook source IPs                  | infra                                                         |
+| #   | Item                                                                                     | Where                                                         |
+| --- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| 1   | Base URLs (sandbox, production)                                                          | `.env` `NYMCARD_BASE_URL`                                     |
+| 2   | Auth scheme (API key header vs OAuth client-credentials + token refresh)                 | `NymCardHttpClient.request`                                   |
+| 3   | Create cardholder endpoint + required KYC fields                                         | `createCardholder`                                            |
+| 4   | Issue virtual card endpoint, product id, idempotency support                             | `createVirtualCard`                                           |
+| 5   | Card object fields (`last4`, expiry, status values, balance)                             | `mapCard`                                                     |
+| 6   | Status change endpoint and status names (freeze/unfreeze/terminate)                      | `setCardStatus`                                               |
+| 7   | Spending-limit / velocity-control endpoint                                               | `setSpendingLimit`                                            |
+| 8   | Load / unload funds endpoints (or account-to-card transfers)                             | `loadFunds`, `unloadFunds`                                    |
+| 9   | **Secure card display** (iframe/SDK URL or token) and its origin for CSP                 | `createSecureDisplaySession`, `NYMCARD_SECURE_DISPLAY_ORIGIN` |
+| 10  | Transactions list endpoint + pagination                                                  | `listTransactions`                                            |
+| 11  | Webhook signature header, algorithm, timestamp/replay protection                         | `verifyNymCardSignature`, `NYMCARD_WEBHOOK_SIGNATURE_HEADER`  |
+| 12  | Webhook event names and payload fields                                                   | `parseNymCardEvent`                                           |
+| 13  | Error codes worth mapping to user messages (insufficient funds, card blocked…)           | `NymCardHttpClient.request`                                   |
+| 15  | Idempotency semantics: a repeated key must replay the original result **and rejections** | `request`, DECISIONS D9                                       |
+| 16  | Whether unloads are allowed on frozen cards (we fall back to reactivating briefly)       | `CardsService.unloadForCancellation`                          |
+| 17  | Settlement/funding reports to reconcile loads/unloads against our wallet ledger          | `ReconciliationService`                                       |
+| 14  | IP allow-listing of our egress IPs / their webhook source IPs                            | infra                                                         |
 
 ## Webhook pipeline
 
@@ -43,15 +46,29 @@ worker ──▶ parseNymCardEvent ──▶ CardEventsService.apply ──▶ C
                                                          └─▶ monitoring rules → SuspiciousActivityFlag
 ```
 
-- Duplicate deliveries return `200 {duplicate:true}` and are not processed twice.
-- Out-of-order events: a settled/reversed transaction is never moved back to pending.
+- Duplicate deliveries return `200 {duplicate:true}` and are not processed twice. If the original
+  delivery was stored but never enqueued (Redis down), the redelivery re-enqueues it; the worker's
+  `resume-operations` job also sweeps events that no worker picked up within 5 minutes.
+- The worker processes the **normalised** event captured from the raw body at ingest
+  (`WebhookEvent.normalized`); the stored `payload` is redacted and only kept for support/audit.
+- Out-of-order events: a transaction never moves back to pending and reversed/declined ones are
+  final; card status events older than `Card.statusChangedAt` and balances older than
+  `Card.balanceAsOf` are ignored. Merchant refunds are stored as their own rows.
+- A card cancelled by the issuer while it still holds money raises an
+  `ISSUER_CANCELLED_WITH_BALANCE` flag (we can no longer sweep it).
 - Events for a card we don't know yet throw, so the job retries (8 attempts, exponential backoff).
 - Jobs that exhaust retries stay unprocessed and appear in Admin → Webhooks with a Retry button.
 
 ## Reconciliation
 
 Nightly at 02:00 Asia/Dubai the worker compares every non-cancelled card's status and balance with
-NymCard, repairs drift and writes `reconciliation.card_drift` audit entries.
+NymCard, repairs drift and writes `reconciliation.card_drift` audit entries. Cards with an operation
+in flight are skipped. It also checks every wallet's cached balance against the sum of its ledger
+(`reconciliation.wallet_drift`, never auto-corrected) and marks checkouts abandoned for 24 h as
+`FAILED`. Unrecognised NymCard card statuses are treated as an error, never mapped to `CANCELLED`.
+
+Every 5 minutes, `resume-operations` finishes interrupted issuances, fundings, cancellations and
+refunds (DECISIONS D9).
 
 ## Go-live checklist
 

@@ -1,4 +1,20 @@
+import { ServiceUnavailableException, UnprocessableEntityException } from '@nestjs/common';
+
 export const PAYMENT_GATEWAY = Symbol('PAYMENT_GATEWAY');
+
+/** The gateway definitively refused the request; nothing happened, safe to compensate. */
+export class GatewayRejectedError extends UnprocessableEntityException {
+  constructor(readonly reason: string) {
+    super({ code: 'PAYMENT_GATEWAY_REJECTED', reason });
+  }
+}
+
+/** Timeout / network / 5xx: the outcome is unknown. Retry with the same idempotency key. */
+export class GatewayUnavailableError extends ServiceUnavailableException {
+  constructor(readonly reason: string) {
+    super({ code: 'PAYMENT_GATEWAY_ERROR' });
+  }
+}
 
 export interface CheckoutSessionInput {
   purchaseId: string;
@@ -25,6 +41,7 @@ export type GatewayEvent =
       reference?: string;
       paymentId: string;
       amountFils: number;
+      currency?: string;
     }
   | {
       eventId: string;

@@ -34,6 +34,7 @@ export class MockGateway implements PaymentGateway {
         sessionId,
         paymentId: `mock-pay-${sessionId}`,
         amountFils: Number(body.amountFils ?? 0),
+        currency: 'AED',
       };
     }
     return { eventId: `mock-evt-${sessionId}-failed`, type: 'payment.failed', sessionId };

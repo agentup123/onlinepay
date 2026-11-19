@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -12,6 +13,7 @@ import {
   Req,
   Res,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import type { Response } from 'express';
@@ -25,7 +27,8 @@ import { env } from '../config/env';
 import { CardsService } from '../cards/cards.service';
 import { KycService } from '../kyc/kyc.service';
 import { PaymentsService } from '../payments/payments.service';
-import { WebhooksService } from '../webhooks/webhooks.service';
+import { STALE_WEBHOOK_MS, WebhooksService } from '../webhooks/webhooks.service';
+import { Idempotent, IdempotencyInterceptor } from '../common/idempotency.interceptor';
 import {
   ADMIN_COOKIE,
   ADMIN_SESSION_TTL_MS,
@@ -33,6 +36,29 @@ import {
   AdminGuard,
   Roles,
 } from './admin-auth';
+
+/** Validates an optional enum query parameter (unknown values are a 400, not a 500). */
+function queryEnum<T extends string>(
+  name: string,
+  values: readonly [T, ...T[]],
+  value: string | undefined,
+): T | undefined {
+  if (value === undefined || value === '') return undefined;
+  const parsed = z.enum(values).safeParse(value);
+  if (!parsed.success) throw new BadRequestException({ code: 'INVALID_QUERY', param: name });
+  return parsed.data;
+}
+
+const KYC_STATUSES = ['PENDING', 'APPROVED', 'REJECTED', 'NEEDS_INFO'] as const;
+const CARD_STATUSES = ['ACTIVE', 'FROZEN', 'CANCELLED'] as const;
+const PURCHASE_STATUSES = ['PENDING', 'PAID', 'FAILED', 'REFUNDED', 'PARTIALLY_REFUNDED'] as const;
+const FLAG_STATUSES = ['OPEN', 'REVIEWING', 'DISMISSED', 'ESCALATED'] as const;
+
+/** Stored but never picked up by a worker, or failed at least once. */
+const unprocessedWebhooks = (): Prisma.WebhookEventWhereInput => ({
+  processedAt: null,
+  OR: [{ attempts: { gte: 1 } }, { receivedAt: { lt: new Date(Date.now() - STALE_WEBHOOK_MS) } }],
+});
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -125,7 +151,7 @@ export class AdminController {
         _sum: { totalFils: true },
         _count: true,
       }),
-      this.prisma.webhookEvent.count({ where: { processedAt: null, attempts: { gte: 3 } } }),
+      this.prisma.webhookEvent.count({ where: unprocessedWebhooks() }),
     ]);
     return {
       users,
@@ -205,16 +231,22 @@ export class AdminController {
         data: { revokedAt: new Date() },
       }),
     ]);
+    // A suspended user must not keep spending: freeze every live card at the issuer too.
+    const cards = await this.cards.freezeAllForUser(
+      { type: 'ADMIN', id: admin.id, reason: `user suspended: ${body.reason}` },
+      id,
+      meta,
+    );
     await this.audit.log({
       actorType: 'ADMIN',
       actorId: admin.id,
       action: 'admin.user.suspend',
       targetType: 'User',
       targetId: id,
-      metadata: body,
+      metadata: { ...body, cardsFrozen: cards.frozen, cardsFailed: cards.failed },
       meta,
     });
-    return { ok: true };
+    return { ok: cards.failed.length === 0, cards };
   }
 
   @Post('users/:id/reactivate')
@@ -241,9 +273,9 @@ export class AdminController {
 
   // ── KYC ──
   @Get('kyc')
-  kycQueue(@Query('status') status = 'PENDING') {
+  kycQueue(@Query('status') status?: string) {
     return this.prisma.kycApplication.findMany({
-      where: { status: status as 'PENDING' },
+      where: { status: queryEnum('status', KYC_STATUSES, status) ?? 'PENDING' },
       orderBy: { createdAt: 'asc' },
       take: 100,
       include: { user: { select: { id: true, fullName: true, email: true } } },
@@ -293,9 +325,10 @@ export class AdminController {
 
   // ── Cards ──
   @Get('cards')
-  cardsList(@Query('status') status?: 'ACTIVE' | 'FROZEN' | 'CANCELLED') {
+  cardsList(@Query('status') status?: string) {
+    const filter = queryEnum('status', CARD_STATUSES, status);
     return this.prisma.card.findMany({
-      where: status ? { status } : {},
+      where: filter ? { status: filter } : {},
       orderBy: { createdAt: 'desc' },
       take: 100,
       include: { user: { select: { id: true, fullName: true, email: true } } },
@@ -370,8 +403,9 @@ export class AdminController {
   // ── Purchases & refunds ──
   @Get('purchases')
   purchases(@Query('status') status?: string) {
+    const filter = queryEnum('status', PURCHASE_STATUSES, status);
     return this.prisma.purchase.findMany({
-      where: status ? { status: status as 'PAID' } : {},
+      where: filter ? { status: filter } : {},
       orderBy: { createdAt: 'desc' },
       take: 100,
       include: {
@@ -385,6 +419,8 @@ export class AdminController {
   @Post('purchases/:id/refund')
   @HttpCode(200)
   @Roles('SUPER_ADMIN')
+  @UseInterceptors(IdempotencyInterceptor)
+  @Idempotent()
   refund(
     @Param('id', ParseUUIDPipe) id: string,
     @Body(new ZodPipe(refundSchema)) body: z.infer<typeof refundSchema>,
@@ -396,9 +432,9 @@ export class AdminController {
 
   // ── Monitoring ──
   @Get('flags')
-  flags(@Query('status') status = 'OPEN') {
+  flags(@Query('status') status?: string) {
     return this.prisma.suspiciousActivityFlag.findMany({
-      where: { status: status as 'OPEN' },
+      where: { status: queryEnum('status', FLAG_STATUSES, status) ?? 'OPEN' },
       orderBy: { createdAt: 'desc' },
       take: 100,
       include: { user: { select: { id: true, fullName: true, email: true } } },
@@ -473,7 +509,7 @@ export class AdminController {
   @Get('webhooks/failed')
   failedWebhooks() {
     return this.prisma.webhookEvent.findMany({
-      where: { processedAt: null, attempts: { gte: 1 } },
+      where: unprocessedWebhooks(),
       orderBy: { receivedAt: 'desc' },
       take: 100,
       select: {
