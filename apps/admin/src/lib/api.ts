@@ -7,14 +7,22 @@ export const aed = (fils: number) => formatFils(fils);
 export const dt = (iso: string) =>
   new Date(iso).toLocaleString('en-AE', { timeZone: 'Asia/Dubai' });
 
+/** One key per admin action: retries of the same action are deduplicated by the API. */
+export function newIdempotencyKey() {
+  return crypto.randomUUID().replace(/-/g, '');
+}
+
 export async function api<T = unknown>(
   path: string,
-  init: { method?: string; body?: unknown } = {},
+  init: { method?: string; body?: unknown; idempotencyKey?: string } = {},
 ): Promise<T> {
   const res = await fetch(`/api${path}`, {
     method: init.method ?? (init.body !== undefined ? 'POST' : 'GET'),
     credentials: 'same-origin',
-    headers: init.body !== undefined ? { 'content-type': 'application/json' } : {},
+    headers: {
+      ...(init.body !== undefined ? { 'content-type': 'application/json' } : {}),
+      ...(init.idempotencyKey ? { 'idempotency-key': init.idempotencyKey } : {}),
+    },
     body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
   });
   const text = await res.text();

@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { addVat } from './vat';
+import { addVat, CARDS_30_PRICE_EXCL_VAT_FILS } from './vat';
 import { parseAedToFils } from './money';
 import { canPerform, nextStatus } from './card-state';
 import { computeQuota } from './bundle';
 import { redact } from './redact';
-import { uaePhoneSchema } from './schemas';
+import { ageOn, kycSubmitSchema, uaePhoneSchema } from './schemas';
 
 describe('VAT', () => {
   it('adds 5% VAT to the 30 AED bundle', () => {
@@ -100,5 +100,48 @@ describe('UAE phone', () => {
   });
   it('rejects non-UAE numbers', () => {
     expect(uaePhoneSchema.safeParse('+447700900000').success).toBe(false);
+  });
+});
+
+describe('bundle quota with pending issuances', () => {
+  it('holds a slot for a card that is still being issued', () => {
+    expect(
+      computeQuota({
+        purchasedSlots: 30,
+        cardStatuses: ['ACTIVE'],
+        cancelledCountsAgainstBundle: true,
+        pendingIssuances: 2,
+      }),
+    ).toEqual({ purchased: 30, used: 3, remaining: 27 });
+  });
+});
+
+describe('KYC age check', () => {
+  const today = new Date('2026-11-19T12:00:00Z');
+  it('computes whole years, counting the birthday itself', () => {
+    expect(ageOn('2008-11-19', today)).toBe(18);
+    expect(ageOn('2008-11-20', today)).toBe(17);
+    expect(ageOn('1990-01-01', today)).toBe(36);
+  });
+  it('rejects minors and impossible dates', () => {
+    const base = { documentType: 'EMIRATES_ID', nationality: 'ae', providerCaptureRef: 'ref' };
+    expect(kycSubmitSchema.safeParse({ ...base, dateOfBirth: '1990-05-01' }).success).toBe(true);
+    const minor = new Date();
+    minor.setUTCFullYear(minor.getUTCFullYear() - 17);
+    expect(
+      kycSubmitSchema.safeParse({ ...base, dateOfBirth: minor.toISOString().slice(0, 10) }).success,
+    ).toBe(false);
+    expect(kycSubmitSchema.safeParse({ ...base, dateOfBirth: '1990-02-30' }).success).toBe(false);
+  });
+});
+
+describe('30-card bundle price', () => {
+  it('is exactly 30.00 AED including VAT', () => {
+    expect(addVat(CARDS_30_PRICE_EXCL_VAT_FILS)).toEqual({
+      subtotalFils: 2857,
+      vatFils: 143,
+      totalFils: 3000,
+      vatRateBps: 500,
+    });
   });
 });

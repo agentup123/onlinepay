@@ -25,8 +25,8 @@
     "cta": "Get 30 cards for 30 AED",
     "pricingTitle": "Simple pricing",
     "pricingBundle": "30 virtual cards",
-    "pricingDetail": "1 AED per card · one-time purchase",
-    "vatNote": "Price excludes 5% VAT. Total at checkout: {total}.",
+    "pricingDetail": "1 AED per card, VAT included · one-time purchase",
+    "vatNote": "Includes 5% VAT ({vat}). Price before VAT: {subtotal}.",
     "useCasesTitle": "Made for everyday online life",
     "useCases": {
       "shopping": "Online shopping without exposing your bank card",
@@ -103,7 +103,11 @@
     "showCancelled": "Show cancelled cards"
   },
   "card": {
-    "status": { "ACTIVE": "Active", "FROZEN": "Frozen", "CANCELLED": "Cancelled" },
+    "status": {
+      "ACTIVE": "Active",
+      "FROZEN": "Frozen",
+      "CANCELLED": "Cancelled"
+    },
     "balance": "Balance",
     "expires": "Expires",
     "freeze": "Freeze",
@@ -199,7 +203,21 @@
     "BUNDLE_EXHAUSTED": "You've used all your cards. Buy another bundle.",
     "INSUFFICIENT_WALLET_BALANCE": "Not enough money in your wallet. Top up first.",
     "CARD_ACTION_NOT_ALLOWED": "That action isn't available for this card.",
-    "VALIDATION_ERROR": "Please check the highlighted details."
+    "VALIDATION_ERROR": "Please check the highlighted details.",
+    "CARD_FROZEN_BY_ADMIN": "This card was frozen by our compliance team. Please contact support.",
+    "CARD_FUNDING_PENDING": "We're confirming your top-up with the card issuer. Check again in a few minutes.",
+    "CARD_FUNDING_FAILED": "That top-up was declined and the amount is back in your wallet.",
+    "CARD_ISSUANCE_FAILED": "We couldn't create that card. Please try again.",
+    "CARDHOLDER_NOT_READY": "Your card account is still being set up. Please try again in a few minutes.",
+    "CARD_CANCELLATION_IN_PROGRESS": "This card is being cancelled.",
+    "CARD_OPERATION_IN_PROGRESS": "Another action on this card is still in progress. Try again shortly.",
+    "CARD_CANCELLATION_RETRY": "The card balance changed while cancelling. Please try again.",
+    "CARD_STATE_CHANGED": "This card changed in the meantime. Refresh and try again.",
+    "ISSUER_REJECTED": "The card issuer declined this request.",
+    "ISSUER_UNAVAILABLE": "The card issuer is not responding. Please try again shortly.",
+    "WALLET_LIMIT_EXCEEDED": "This top-up would take your wallet above its maximum balance.",
+    "TOPUP_LIMIT_EXCEEDED": "This top-up would exceed your 30-day top-up limit.",
+    "SMS_DELIVERY_FAILED": "We couldn't send the SMS code. Please try again in a moment."
   },
   "footer": {
     "issuer": "Cards are issued by our licensed issuing partner via NymCard. OnlinePay is a programme manager, not a bank."

@@ -1,4 +1,4 @@
-import { Logger, ServiceUnavailableException } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import type {
   CreateCardholderInput,
@@ -9,6 +9,18 @@ import type {
   NymCardClient,
   SecureDisplaySession,
 } from './nymcard.types';
+import { IssuerRejectedError, IssuerUnavailableError, issuerErrorForStatus } from './nymcard.types';
+
+// TODO(nymcard-docs): confirm the full list of NymCard card statuses.
+const ISSUER_STATUS_MAP: Record<string, IssuerCardStatus | undefined> = {
+  ACTIVE: 'ACTIVE',
+  FROZEN: 'FROZEN',
+  BLOCKED: 'FROZEN',
+  SUSPENDED: 'FROZEN',
+  CANCELLED: 'CANCELLED',
+  CLOSED: 'CANCELLED',
+  TERMINATED: 'CANCELLED',
+};
 
 export interface NymCardHttpConfig {
   baseUrl: string;
@@ -45,8 +57,9 @@ export class NymCardHttpClient implements NymCardClient {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.cfg.timeoutMs ?? 15_000);
     const requestId = randomUUID();
+    let res: Response;
     try {
-      const res = await fetch(new URL(path, this.cfg.baseUrl), {
+      res = await fetch(new URL(path, this.cfg.baseUrl), {
         method,
         signal: controller.signal,
         headers: {
@@ -59,12 +72,25 @@ export class NymCardHttpClient implements NymCardClient {
         },
         body: body === undefined ? undefined : JSON.stringify(body),
       });
+    } catch (err) {
+      // Timeout or network failure: the request may still have been applied by NymCard.
+      clearTimeout(timer);
+      this.logger.warn(
+        `NymCard ${method} ${path} failed: ${(err as Error).name} (request ${requestId})`,
+      );
+      throw new IssuerUnavailableError(`${method} ${path}: ${(err as Error).name}`);
+    }
+    try {
       if (!res.ok) {
         // Log status + request id only; response bodies may contain card data.
         this.logger.warn(`NymCard ${method} ${path} -> ${res.status} (request ${requestId})`);
-        throw new ServiceUnavailableException({ code: 'ISSUER_ERROR', status: res.status });
+        throw issuerErrorForStatus(res.status, `${method} ${path}`);
       }
       return (await res.json()) as T;
+    } catch (err) {
+      if (err instanceof IssuerRejectedError || err instanceof IssuerUnavailableError) throw err;
+      // The response body could not be read: treat the outcome as unknown.
+      throw new IssuerUnavailableError(`${method} ${path}: unreadable response`);
     } finally {
       clearTimeout(timer);
     }
@@ -72,18 +98,19 @@ export class NymCardHttpClient implements NymCardClient {
 
   private mapCard(raw: Record<string, unknown>): IssuerCard {
     // TODO(nymcard-docs): confirm card response fields.
-    const status = String(raw.status ?? '').toUpperCase();
+    const rawStatus = String(raw.status ?? '').toUpperCase();
+    const status = ISSUER_STATUS_MAP[rawStatus];
+    if (!status) {
+      // Never guess: mapping an unknown status to CANCELLED would let reconciliation kill a
+      // live card and strand its balance.
+      throw new IssuerUnavailableError(`Unrecognised NymCard card status "${rawStatus}"`);
+    }
     return {
       id: String(raw.id),
       last4: String(raw.last_four ?? raw.last4 ?? ''),
       expiryMonth: Number(raw.expiry_month),
       expiryYear: Number(raw.expiry_year),
-      status:
-        status === 'FROZEN' || status === 'BLOCKED'
-          ? 'FROZEN'
-          : status === 'ACTIVE'
-            ? 'ACTIVE'
-            : 'CANCELLED',
+      status,
       balanceFils: Number(raw.available_balance ?? 0),
     };
   }
@@ -140,7 +167,7 @@ export class NymCardHttpClient implements NymCardClient {
     const res = await this.request<{ id: string; available_balance: number }>(
       'POST',
       `/v1/cards/${cardId}/load`,
-      { amount: amountFils, currency: 'AED' },
+      { amount: amountFils, currency: 'AED', reference: idempotencyKey },
       idempotencyKey,
     );
     return { providerRef: res.id, balanceFils: res.available_balance };
@@ -154,10 +181,24 @@ export class NymCardHttpClient implements NymCardClient {
     const res = await this.request<{ id: string; available_balance: number }>(
       'POST',
       `/v1/cards/${cardId}/unload`,
-      { amount: amountFils, currency: 'AED' },
+      { amount: amountFils, currency: 'AED', reference: idempotencyKey },
       idempotencyKey,
     );
     return { providerRef: res.id, balanceFils: res.available_balance };
+  }
+
+  async findFundsOperation(cardId: string, reference: string): Promise<FundsResult | null> {
+    // TODO(nymcard-docs): confirm how to look up a load/unload by our reference (filter on the
+    // card's transfer history, or a dedicated endpoint) and which statuses mean "applied".
+    const res = await this.request<{ data: Record<string, unknown>[] }>(
+      'GET',
+      `/v1/cards/${cardId}/transfers?reference=${encodeURIComponent(reference)}`,
+    );
+    const op = res.data.find(
+      (t) => t.reference === reference && String(t.status ?? '').toUpperCase() !== 'FAILED',
+    );
+    if (!op) return null;
+    return { providerRef: String(op.id), balanceFils: Number(op.available_balance ?? NaN) };
   }
 
   async createSecureDisplaySession(cardId: string): Promise<SecureDisplaySession> {

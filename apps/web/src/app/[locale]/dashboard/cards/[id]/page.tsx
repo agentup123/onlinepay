@@ -106,7 +106,7 @@ export default function CardPage({ params }: { params: Promise<{ id: string }> }
             ) : (
               <button
                 className="btn-secondary flex-1"
-                disabled={busy}
+                disabled={busy || c.frozenBy === 'ADMIN'}
                 onClick={() => run(() => api(`/cards/${id}/unfreeze`, { body: {} }))}
                 data-testid="unfreeze"
               >

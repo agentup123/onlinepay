@@ -17,6 +17,7 @@ import { ZodPipe } from '../common/zod.pipe';
 import { PrismaService } from '../prisma/prisma.service';
 import { WebhooksModule } from '../webhooks/webhooks.module';
 import { WebhooksService } from '../webhooks/webhooks.service';
+import { parseNymCardEvent } from '../nymcard/nymcard.webhook';
 
 const simulateSchema = z.object({
   cardId: z.string().uuid(),
@@ -70,7 +71,14 @@ export class DevController {
         },
       };
       const raw = Buffer.from(JSON.stringify(payload));
-      await this.webhooks.ingest('nymcard', payload.id, payload.type, raw, payload);
+      await this.webhooks.ingest(
+        'nymcard',
+        payload.id,
+        payload.type,
+        raw,
+        payload,
+        parseNymCardEvent(payload),
+      );
     }
     return { transactionId: txnId };
   }

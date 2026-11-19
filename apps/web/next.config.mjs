@@ -29,7 +29,8 @@ const nextConfig = {
   // The browser only ever talks to this origin; /api is proxied to the NestJS API so
   // session cookies stay first-party and API credentials never reach the client.
   async rewrites() {
-    return [{ source: '/api/:path*', destination: `${API_URL}/:path*` }];
+    // Never proxy the admin API through the public consumer site.
+    return [{ source: '/api/:path((?!admin(?:/|$)).*)', destination: `${API_URL}/:path` }];
   },
   async headers() {
     return [

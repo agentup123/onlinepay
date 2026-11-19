@@ -26,7 +26,7 @@ const OUTLINE: Record<Page, string[]> = {
     'Your rights under the UAE PDPL and how to contact us',
   ],
   fees: [
-    '30 virtual cards: 30.00 AED + 5% VAT (31.50 AED), one-time',
+    '30 virtual cards: 30.00 AED including 5% VAT (28.57 AED + 1.43 AED VAT), one-time',
     'Wallet top-ups: no OnlinePay fee (gateway fees TBD)',
     'Foreign-currency transactions: issuer FX rate and any FX fee — TBD with NymCard',
     'Card cancellation: free; remaining balance returned to wallet',

@@ -105,6 +105,12 @@ enum KycStatus {
   NEEDS_INFO
 }
 
+enum ScreeningStatus {
+  CLEAR
+  POTENTIAL_MATCH
+  ERROR
+}
+
 enum KycDocumentType {
   EMIRATES_ID
   PASSPORT
@@ -123,11 +129,16 @@ model KycApplication {
   reviewNote         String?
   reviewedByAdminId  String?
   reviewedAt         DateTime?
+  screeningStatus    ScreeningStatus? // sanctions / PEP screening result
+  screeningRef       String?          // screening vendor's case id
+  screeningSummary   String?
+  screenedAt         DateTime?
   createdAt          DateTime        @default(now())
   updatedAt          DateTime        @updatedAt
 
   @@unique([provider, providerRef])
   @@index([status])
+  @@index([status, screenedAt])
 }
 
 // ───────────────────────────── Bundles, purchases, invoices ─────────────────────────────
@@ -191,6 +202,7 @@ model Purchase {
   refunds Refund[]
 
   @@index([userId, status])
+  @@index([type, status, createdAt])
 }
 
 model Invoice {
@@ -231,8 +243,12 @@ model Refund {
   status          RefundStatus @default(REQUESTED)
   gatewayRefundId String?      @unique
   createdByAdmin  String?
+  attempts        Int          @default(0)
+  lastError       String?
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
+
+  @@index([status, updatedAt])
 }
 
 // ───────────────────────────── Wallet ─────────────────────────────
@@ -281,6 +297,12 @@ enum CardStatus {
   CANCELLED
 }
 
+/// Who froze a card. A user may only unfreeze (or cancel) a card they froze themselves.
+enum CardFreezeSource {
+  USER
+  ADMIN
+}
+
 model Card {
   id                   String     @id @default(uuid())
   userId               String
@@ -291,13 +313,18 @@ model Card {
   expiryMonth          Int
   expiryYear           Int
   status               CardStatus @default(ACTIVE)
+  frozenBy             CardFreezeSource?
+  statusChangedAt      DateTime   @default(now()) // ignore issuer status events older than this
   spendingLimitFils    Int?
   availableBalanceFils Int        @default(0) // refreshed from NymCard; display only
+  balanceAsOf          DateTime?  // timestamp of the issuer event/response behind availableBalanceFils
   cancelledAt          DateTime?
   createdAt            DateTime   @default(now())
   updatedAt            DateTime   @updatedAt
 
   transactions CardTransaction[]
+  fundings     CardFunding[]
+  cancellation CardCancellation?
 
   @@index([userId, status])
 }
@@ -339,6 +366,79 @@ model CardTransaction {
   @@index([cardId, occurredAt])
 }
 
+// ───────────────────────────── Card operations ─────────────────────────────
+// Every call that moves money or creates something at NymCard is persisted *before* the call.
+// A row is only moved to FAILED when the issuer definitively rejected the request; timeouts and
+// 5xx leave it UNKNOWN so the worker can retry with the same issuer idempotency key.
+
+enum OperationStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  UNKNOWN
+}
+
+model CardIssuance {
+  id                String          @id @default(uuid())
+  userId            String
+  idempotencyKey    String          @unique // "<userId>:<client Idempotency-Key>"
+  label             String
+  spendingLimitFils Int?
+  status            OperationStatus @default(PENDING)
+  cardId            String?         @unique
+  attempts          Int             @default(0)
+  lastError         String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  @@index([userId, status])
+  @@index([status, updatedAt])
+}
+
+model CardFunding {
+  id             String          @id @default(uuid())
+  userId         String
+  cardId         String
+  card           Card            @relation(fields: [cardId], references: [id])
+  amountFils     Int
+  idempotencyKey String          @unique // "<cardId>:<client Idempotency-Key>"
+  status         OperationStatus @default(PENDING)
+  providerRef    String?
+  attempts       Int             @default(0)
+  lastError      String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@index([cardId, status])
+  @@index([status, updatedAt])
+}
+
+enum CancellationStatus {
+  PENDING // requested; balance not read yet
+  SWEEPING // balance recorded in sweepFils; unload may or may not have happened
+  SWEPT // unload done and wallet credited
+  COMPLETED // card cancelled at the issuer and locally
+}
+
+model CardCancellation {
+  id              String             @id @default(uuid())
+  cardId          String             @unique
+  card            Card               @relation(fields: [cardId], references: [id])
+  userId          String
+  requestedByType ActorType
+  requestedById   String?
+  reason          String?
+  status          CancellationStatus @default(PENDING)
+  sweepFils       Int?
+  unloadRef       String?
+  attempts        Int                @default(0)
+  lastError       String?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  @@index([status, updatedAt])
+}
+
 // ───────────────────────────── Webhooks ─────────────────────────────
 
 model WebhookEvent {
@@ -348,6 +448,7 @@ model WebhookEvent {
   eventType       String
   payloadHash     String
   payload         Json      // already redacted
+  normalized      Json?     // provider-neutral event parsed from the raw body; what the worker processes
   receivedAt      DateTime  @default(now())
   processedAt     DateTime?
   attempts        Int       @default(0)
@@ -355,6 +456,7 @@ model WebhookEvent {
 
   @@unique([provider, providerEventId])
   @@index([processedAt])
+  @@index([processedAt, receivedAt])
 }
 
 // ───────────────────────────── Notifications ─────────────────────────────
@@ -402,6 +504,9 @@ model AdminUser {
   role         AdminRole
   active       Boolean   @default(true)
   lastLoginAt  DateTime?
+  lastTotpStep Int?      // last accepted TOTP time-step; blocks replay of the same code
+  failedLoginCount Int   @default(0)
+  lockedUntil  DateTime?
   createdAt    DateTime  @default(now())
 
   sessions AdminSession[]

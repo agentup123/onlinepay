@@ -18,6 +18,11 @@ import type { AuthedRequest, RequestMeta } from '../common/request';
 export const ADMIN_COOKIE = 'op_admin';
 export const ADMIN_SESSION_TTL_MS = 8 * 60 * 60 * 1000; // one working day
 const ROLES_KEY = 'admin_roles';
+const MAX_FAILED_LOGINS = 5;
+const LOCKOUT_MS = 15 * 60 * 1000;
+const TOTP_STEP_SECONDS = 30;
+
+const currentTotpStep = () => Math.floor(Date.now() / 1000 / TOTP_STEP_SECONDS);
 
 /** Restrict an admin route to roles. SUPER_ADMIN always passes. */
 export const Roles = (...roles: AdminRole[]) => SetMetadata(ROLES_KEY, roles);
@@ -30,24 +35,57 @@ export class AdminAuthService {
   ) {}
 
   async login(email: string, password: string, totp: string, meta: RequestMeta) {
-    const admin = await this.prisma.adminUser.findUnique({ where: { email: email.toLowerCase() } });
+    const admin = await this.prisma.adminUser.findUnique({
+      where: { email: email.toLowerCase() },
+    });
     // Always run bcrypt to keep timing uniform for unknown emails.
     const hash =
       admin?.passwordHash ?? '$2a$12$C6UzMDM.H6dfI/f/IKcEeO2ZTYV5RbyGQpWuQKu1jGa0lcj3cT2B6';
     const passwordOk = await bcrypt.compare(password, hash);
-    const totpOk =
-      !!admin?.totpSecret && authenticator.verify({ token: totp, secret: admin.totpSecret });
+    const locked = !!admin?.lockedUntil && admin.lockedUntil > new Date();
 
-    if (!admin || !admin.active || !passwordOk || !totpOk) {
+    // Accept a code once: its time-step must be newer than the last one used (blocks replay of
+    // a shoulder-surfed or phished code within its validity window).
+    const delta = admin?.totpSecret ? authenticator.checkDelta(totp, admin.totpSecret) : null;
+    const totpStep = delta === null ? null : currentTotpStep() + delta;
+    const totpReplayed = totpStep !== null && (admin?.lastTotpStep ?? -1) >= totpStep;
+
+    if (!admin || !admin.active || locked || !passwordOk || totpStep === null || totpReplayed) {
+      if (admin && !locked) {
+        const failures = admin.failedLoginCount + 1;
+        await this.prisma.adminUser.update({
+          where: { id: admin.id },
+          data: {
+            failedLoginCount: failures >= MAX_FAILED_LOGINS ? 0 : failures,
+            lockedUntil:
+              failures >= MAX_FAILED_LOGINS ? new Date(Date.now() + LOCKOUT_MS) : undefined,
+          },
+        });
+      }
       await this.audit.log({
         actorType: 'ADMIN',
         actorId: admin?.id,
-        action: 'admin.login_failed',
+        action: locked ? 'admin.login_locked' : 'admin.login_failed',
         metadata: { email },
         meta,
       });
       throw new UnauthorizedException({ code: 'INVALID_CREDENTIALS' });
     }
+
+    // Claim the TOTP step atomically so two parallel logins with the same code can't both pass.
+    const claimed = await this.prisma.adminUser.updateMany({
+      where: {
+        id: admin.id,
+        OR: [{ lastTotpStep: null }, { lastTotpStep: { lt: totpStep } }],
+      },
+      data: {
+        lastTotpStep: totpStep,
+        failedLoginCount: 0,
+        lockedUntil: null,
+        lastLoginAt: new Date(),
+      },
+    });
+    if (claimed.count !== 1) throw new UnauthorizedException({ code: 'INVALID_CREDENTIALS' });
 
     const token = randomToken();
     await this.prisma.adminSession.create({
@@ -57,10 +95,6 @@ export class AdminAuthService {
         ip: meta.ip,
         expiresAt: new Date(Date.now() + ADMIN_SESSION_TTL_MS),
       },
-    });
-    await this.prisma.adminUser.update({
-      where: { id: admin.id },
-      data: { lastLoginAt: new Date() },
     });
     await this.audit.log({ actorType: 'ADMIN', actorId: admin.id, action: 'admin.login', meta });
     return {

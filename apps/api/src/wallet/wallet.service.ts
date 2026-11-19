@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 import { LedgerEntryType, Prisma } from '@onlinepay/db';
 import { assertFils } from '@onlinepay/shared';
 import { PrismaService } from '../prisma/prisma.service';
@@ -48,18 +48,29 @@ export class WalletService {
     if (input.amountFils <= 0) throw new BadRequestException({ code: 'INVALID_AMOUNT' });
 
     const run = async (tx: Prisma.TransactionClient) => {
-      const existing = await tx.walletLedgerEntry.findUnique({
-        where: { idempotencyKey: input.idempotencyKey },
-      });
-      if (existing) return existing;
-
       const wallet = await tx.wallet.upsert({
         where: { userId: input.userId },
         update: {},
         create: { userId: input.userId },
       });
-
       const delta = direction * input.amountFils;
+
+      const existing = await tx.walletLedgerEntry.findUnique({
+        where: { idempotencyKey: input.idempotencyKey },
+      });
+      if (existing) {
+        // A replay must describe exactly the same movement. Returning the old entry for a
+        // different amount/direction/wallet would let a caller skip a debit it now owes.
+        if (
+          existing.walletId !== wallet.id ||
+          existing.amountFils !== delta ||
+          existing.type !== input.type
+        ) {
+          throw new ConflictException({ code: 'LEDGER_IDEMPOTENCY_MISMATCH' });
+        }
+        return existing;
+      }
+
       const updated = await tx.wallet.updateMany({
         where: {
           id: wallet.id,

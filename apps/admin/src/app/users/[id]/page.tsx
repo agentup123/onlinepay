@@ -1,7 +1,7 @@
 'use client';
 
 import { use, useState } from 'react';
-import { aed, api, askReason, dt, useAdminApi } from '@/lib/api';
+import { aed, api, askReason, dt, newIdempotencyKey, useAdminApi } from '@/lib/api';
 import { Btn, ErrorBox, PageTitle, Table } from '@/components/Table';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -14,7 +14,7 @@ export default function UserDetail({ params }: { params: Promise<{ id: string }>
     const reason = askReason(label);
     if (!reason) return;
     try {
-      await api(path, { body: { reason, ...extra } });
+      await api(path, { body: { reason, ...extra }, idempotencyKey: newIdempotencyKey() });
       setActionError(null);
       await reload();
     } catch (e) {
@@ -112,7 +112,7 @@ export default function UserDetail({ params }: { params: Promise<{ id: string }>
                 tone="danger"
                 onClick={() => {
                   const amount = window.prompt(
-                    'Refund amount in fils (e.g. 3150 = 31.50 AED)',
+                    'Refund amount in fils (e.g. 3000 = 30.00 AED)',
                     String(p.totalFils),
                   );
                   if (amount)

@@ -16,10 +16,15 @@ import { PaymentsModule } from './payments/payments.module';
 import { PaymentsService } from './payments/payments.service';
 import { PAYMENT_GATEWAY, PaymentGateway } from './payments/gateway.types';
 import { parseNymCardEvent } from './nymcard/nymcard.webhook';
+import type { NymCardEvent } from './nymcard/nymcard.types';
+import type { GatewayEvent } from './payments/gateway.types';
+import { CardsService } from './cards/cards.service';
+import { KycService } from './kyc/kyc.service';
+import { WebhooksService } from './webhooks/webhooks.service';
 
 @Module({
   imports: [PrismaModule, QueueModule, CommonModule, NymCardModule, CardsModule, PaymentsModule],
-  providers: [ReconciliationService],
+  providers: [ReconciliationService, WebhooksService],
 })
 class WorkerModule {}
 
@@ -33,18 +38,25 @@ async function bootstrap() {
   const payments = app.get(PaymentsService);
   const gateway = app.get<PaymentGateway>(PAYMENT_GATEWAY);
   const reconciliation = app.get(ReconciliationService);
+  const cards = app.get(CardsService);
+  const webhooks = app.get(WebhooksService);
+  const kyc = app.get(KycService);
   const queues = app.get(QueueService);
   const connection = app.get<Redis>(REDIS).duplicate({ maxRetriesPerRequest: null });
 
-  /** Loads the stored webhook, runs the handler, and records the outcome. */
+  /**
+   * Loads the stored webhook, runs the handler, and records the outcome. Handlers receive the
+   * normalised event captured from the raw body at ingest; the redacted `payload` is only parsed
+   * as a fallback for rows stored before `normalized` existed.
+   */
   const processInbox = async (
     job: Job<{ webhookEventId: string }>,
-    handle: (payload: Record<string, unknown>) => Promise<void>,
+    handle: (normalized: unknown, payload: Record<string, unknown>) => Promise<void>,
   ) => {
     const ev = await prisma.webhookEvent.findUnique({ where: { id: job.data.webhookEventId } });
     if (!ev || ev.processedAt) return;
     try {
-      await handle(ev.payload as Record<string, unknown>);
+      await handle(ev.normalized, ev.payload as Record<string, unknown>);
       await prisma.webhookEvent.update({
         where: { id: ev.id },
         data: { processedAt: new Date(), attempts: { increment: 1 }, lastError: null },
@@ -61,19 +73,39 @@ async function bootstrap() {
   const workers = [
     new Worker(
       QUEUES.nymcardEvents,
-      (job) => processInbox(job, (payload) => cardEvents.apply(parseNymCardEvent(payload))),
+      (job) =>
+        processInbox(job, (normalized, payload) =>
+          cardEvents.apply((normalized as NymCardEvent | null) ?? parseNymCardEvent(payload)),
+        ),
       { connection, concurrency: 10 },
     ),
     new Worker(
       QUEUES.paymentEvents,
       (job) =>
-        processInbox(job, (payload) => payments.handleGatewayEvent(gateway.parseWebhook(payload))),
+        processInbox(job, (normalized, payload) =>
+          payments.handleGatewayEvent(
+            (normalized as GatewayEvent | null) ?? gateway.parseWebhook(payload),
+          ),
+        ),
       { connection, concurrency: 5 },
     ),
     new Worker(
       QUEUES.maintenance,
       async (job) => {
-        if (job.name === 'reconcile-cards') await reconciliation.run();
+        if (job.name === 'reconcile-cards') {
+          await reconciliation.run();
+          await payments.expireStalePurchases();
+          // Ongoing sanctions/PEP screening of approved customers.
+          const rescreen = await kyc.rescreenApproved();
+          logger.log(`Rescreen: ${JSON.stringify(rescreen)}`);
+        }
+        if (job.name === 'resume-operations') {
+          // Finish anything interrupted by a crash or an issuer/gateway timeout.
+          const cardOps = await cards.resumeStaleOperations();
+          const refunds = await payments.resumeStaleRefunds();
+          const webhooksRequeued = await webhooks.sweepUnprocessed();
+          logger.log(`Resume: ${JSON.stringify({ ...cardOps, refunds, webhooksRequeued })}`);
+        }
         if (job.name === 'cleanup') {
           const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
           await prisma.idempotencyRecord.deleteMany({ where: { createdAt: { lt: cutoff } } });
@@ -97,6 +129,11 @@ async function bootstrap() {
     'reconcile-cards',
     { pattern: '0 2 * * *', tz: 'Asia/Dubai' },
     { name: 'reconcile-cards' },
+  );
+  await queues.maintenance.upsertJobScheduler(
+    'resume-operations',
+    { every: 5 * 60 * 1000 },
+    { name: 'resume-operations' },
   );
   await queues.maintenance.upsertJobScheduler(
     'cleanup',

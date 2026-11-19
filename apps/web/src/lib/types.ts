@@ -7,6 +7,8 @@ export interface Card {
   expiryMonth: number;
   expiryYear: number;
   status: CardStatus;
+  /** Who froze the card; only a card the user froze themselves can be unfrozen in the app. */
+  frozenBy?: 'USER' | 'ADMIN' | null;
   spendingLimitFils: number | null;
   availableBalanceFils: number;
   createdAt: string;

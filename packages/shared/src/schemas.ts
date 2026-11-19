@@ -29,10 +29,31 @@ export const otpVerifySchema = z.object({
   code: otpCodeSchema,
 });
 
+/** Minimum age to hold a card (consumer product; confirm with NymCard's programme rules). */
+export const MIN_CARDHOLDER_AGE = 18;
+
+function isValidIsoDate(v: string): boolean {
+  const d = new Date(`${v}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === v;
+}
+
+/** Whole years between an ISO date (YYYY-MM-DD) and `today` (UTC). */
+export function ageOn(isoDate: string, today: Date = new Date()): number {
+  const [y, m, d] = isoDate.split('-').map(Number) as [number, number, number];
+  let age = today.getUTCFullYear() - y;
+  const month = today.getUTCMonth() + 1;
+  if (month < m || (month === m && today.getUTCDate() < d)) age--;
+  return age;
+}
+
 export const kycSubmitSchema = z.object({
   documentType: z.enum(['EMIRATES_ID', 'PASSPORT']),
   nationality: z.string().length(2).toUpperCase(),
-  dateOfBirth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  dateOfBirth: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .refine(isValidIsoDate, 'Enter a valid date of birth')
+    .refine((v) => ageOn(v) >= MIN_CARDHOLDER_AGE, 'You must be at least 18 years old'),
   /**
    * Reference returned by the KYC provider's own capture SDK. We never upload or store
    * ID images or full document numbers on our servers.

@@ -5,7 +5,7 @@ config();
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { authenticator } from 'otplib';
-import { addVat } from '@onlinepay/shared';
+import { addVat, CARDS_30_PRICE_EXCL_VAT_FILS } from '@onlinepay/shared';
 
 const prisma = new PrismaClient();
 
@@ -16,13 +16,13 @@ async function main() {
 
   const bundle = await prisma.bundle.upsert({
     where: { code: 'CARDS_30' },
-    update: {},
+    update: { priceFils: CARDS_30_PRICE_EXCL_VAT_FILS },
     create: {
       code: 'CARDS_30',
       nameEn: '30 virtual cards',
       nameAr: '٣٠ بطاقة افتراضية',
       cardQuota: 30,
-      priceFils: 3000,
+      priceFils: CARDS_30_PRICE_EXCL_VAT_FILS, // 30.00 AED incl. VAT
       mode: 'ONE_TIME',
     },
   });

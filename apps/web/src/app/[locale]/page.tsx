@@ -1,14 +1,16 @@
 import { useTranslations } from 'next-intl';
 import { setRequestLocale } from 'next-intl/server';
 import { use } from 'react';
-import { addVat, formatFils } from '@onlinepay/shared';
+import { addVat, CARDS_30_PRICE_EXCL_VAT_FILS, formatFils } from '@onlinepay/shared';
 import { Link } from '@/i18n/routing';
 
 export default function Landing({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = use(params);
   setRequestLocale(locale);
   const t = useTranslations('landing');
-  const total = formatFils(addVat(3000).totalFils, locale as 'en' | 'ar');
+  // UAE consumer pricing is shown VAT-inclusive: 30.00 AED all-in (DECISIONS D12).
+  const price = addVat(CARDS_30_PRICE_EXCL_VAT_FILS);
+  const fmt = (fils: number) => formatFils(fils, locale as 'en' | 'ar');
 
   return (
     <div className="space-y-16">
@@ -32,11 +34,13 @@ export default function Landing({ params }: { params: Promise<{ locale: string }
       <section className="panel mx-auto max-w-md text-center">
         <h2 className="text-xl font-bold">{t('pricingTitle')}</h2>
         <p className="mt-4 text-4xl font-extrabold">
-          <span className="ltr-nums">{formatFils(3000, locale as 'en' | 'ar')}</span>
+          <span className="ltr-nums">{fmt(price.totalFils)}</span>
         </p>
         <p className="mt-1 font-semibold">{t('pricingBundle')}</p>
         <p className="text-slate-500">{t('pricingDetail')}</p>
-        <p className="mt-3 text-sm text-slate-500">{t('vatNote', { total })}</p>
+        <p className="mt-3 text-sm text-slate-500">
+          {t('vatNote', { subtotal: fmt(price.subtotalFils), vat: fmt(price.vatFils) })}
+        </p>
       </section>
 
       <section>

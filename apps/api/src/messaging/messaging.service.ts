@@ -1,6 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import nodemailer, { Transporter } from 'nodemailer';
 import { env } from '../config/env';
+import { TwilioSmsSender } from './twilio.sms';
 
 /**
  * Email + SMS delivery behind one service. In development SMS is printed to the API log
@@ -15,6 +16,16 @@ export class MessagingService {
     port: env.SMTP_PORT,
     secure: env.SMTP_PORT === 465,
   });
+
+  private readonly twilio =
+    env.SMS_PROVIDER === 'twilio'
+      ? new TwilioSmsSender({
+          accountSid: env.TWILIO_ACCOUNT_SID ?? '',
+          authToken: env.TWILIO_AUTH_TOKEN ?? '',
+          senderId: env.TWILIO_SENDER_ID,
+          messagingServiceSid: env.TWILIO_MESSAGING_SERVICE_SID,
+        })
+      : null;
 
   async sendEmail(to: string, subject: string, text: string): Promise<void> {
     try {
@@ -34,8 +45,16 @@ export class MessagingService {
         // Mirror to Mailpit so SMS codes are readable in the browser and by e2e tests.
         await this.sendEmail(`sms+${to.replace(/\D/g, '')}@onlinepay.local`, `SMS to ${to}`, text);
         return;
+      case 'twilio':
+        try {
+          await this.twilio!.send(to, text);
+        } catch (err) {
+          // Never log the body (it contains the code) or the full number.
+          this.logger.warn(`SMS to ***${to.slice(-3)} failed: ${(err as Error).message}`);
+          throw new ServiceUnavailableException({ code: 'SMS_DELIVERY_FAILED' });
+        }
+        return;
       default:
-        // TODO: add a UAE SMS provider adapter (sender ID must be registered with the TDRA).
         throw new Error(`Unsupported SMS provider ${String(env.SMS_PROVIDER)}`);
     }
   }
