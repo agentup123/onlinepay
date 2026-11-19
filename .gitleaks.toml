@@ -1,0 +1,6 @@
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Example env and docs placeholders"
+paths = ['''\.env\.example$''', '''docs/.*\.md$''']

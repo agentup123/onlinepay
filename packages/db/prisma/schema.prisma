@@ -1,0 +1,493 @@
+// OnlinePay data model.
+// Rules:
+//  * Money is stored as integer fils (Int / BigInt) — never Float/Decimal-as-float.
+//  * PAN, CVV, PIN and ID-document images/numbers are NEVER stored. Cards keep only the
+//    NymCard reference, last4 and expiry month/year.
+//  * Ledger, audit and webhook rows are append-only.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ───────────────────────────── Users & auth ─────────────────────────────
+
+enum UserStatus {
+  PENDING_VERIFICATION
+  ACTIVE
+  SUSPENDED
+  CLOSED
+}
+
+enum Locale {
+  en
+  ar
+}
+
+model User {
+  id               String     @id @default(uuid())
+  fullName         String
+  email            String     @unique
+  phone            String     @unique
+  emailVerifiedAt  DateTime?
+  phoneVerifiedAt  DateTime?
+  status           UserStatus @default(PENDING_VERIFICATION)
+  locale           Locale     @default(en)
+  termsAcceptedAt  DateTime
+  nymcardHolderId  String?    @unique
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  sessions      Session[]
+  otpChallenges OtpChallenge[]
+  kyc           KycApplication[]
+  purchases     Purchase[]
+  invoices      Invoice[]
+  wallet        Wallet?
+  cards         Card[]
+  notifications Notification[]
+  flags         SuspiciousActivityFlag[]
+  disputes      Dispute[]
+}
+
+model Session {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash   String   @unique // sha256 of the opaque cookie token; raw token never stored
+  ip          String?
+  userAgent   String?
+  expiresAt   DateTime
+  revokedAt   DateTime?
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+}
+
+enum OtpPurpose {
+  SIGNUP_EMAIL
+  SIGNUP_PHONE
+  LOGIN
+}
+
+enum OtpChannel {
+  EMAIL
+  SMS
+}
+
+model OtpChallenge {
+  id          String     @id @default(uuid())
+  userId      String
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  purpose     OtpPurpose
+  channel     OtpChannel
+  destination String     // email or phone (masked when shown in UI)
+  codeHash    String     // HMAC-SHA256(pepper, code)
+  attempts    Int        @default(0)
+  maxAttempts Int        @default(5)
+  expiresAt   DateTime
+  consumedAt  DateTime?
+  createdAt   DateTime   @default(now())
+
+  @@index([userId, purpose])
+}
+
+// ───────────────────────────── KYC ─────────────────────────────
+
+enum KycStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  NEEDS_INFO
+}
+
+enum KycDocumentType {
+  EMIRATES_ID
+  PASSPORT
+}
+
+model KycApplication {
+  id                 String          @id @default(uuid())
+  userId             String
+  user               User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider           String          // e.g. "mock"
+  providerRef        String          // provider's case/applicant id — documents live with the provider
+  documentType       KycDocumentType
+  nationality        String          @db.Char(2)
+  dateOfBirth        DateTime        @db.Date
+  status             KycStatus       @default(PENDING)
+  reviewNote         String?
+  reviewedByAdminId  String?
+  reviewedAt         DateTime?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  @@unique([provider, providerRef])
+  @@index([status])
+}
+
+// ───────────────────────────── Bundles, purchases, invoices ─────────────────────────────
+
+enum BundleMode {
+  ONE_TIME
+  SUBSCRIPTION
+}
+
+model Bundle {
+  id           String     @id @default(uuid())
+  code         String     @unique // e.g. "CARDS_30"
+  nameEn       String
+  nameAr       String
+  cardQuota    Int
+  priceFils    Int        // VAT-exclusive
+  currency     String     @default("AED")
+  mode         BundleMode @default(ONE_TIME)
+  active       Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  purchases Purchase[]
+}
+
+enum PurchaseType {
+  BUNDLE
+  WALLET_TOPUP
+}
+
+enum PurchaseStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+  PARTIALLY_REFUNDED
+}
+
+model Purchase {
+  id               String         @id @default(uuid())
+  userId           String
+  user             User           @relation(fields: [userId], references: [id])
+  type             PurchaseType
+  bundleId         String?
+  bundle           Bundle?        @relation(fields: [bundleId], references: [id])
+  cardQuota        Int            @default(0) // snapshot of bundle quota at purchase time
+  subtotalFils     Int
+  vatFils          Int
+  totalFils        Int
+  currency         String         @default("AED")
+  status           PurchaseStatus @default(PENDING)
+  gateway          String
+  gatewaySessionId String?        @unique
+  gatewayPaymentId String?        @unique
+  idempotencyKey   String         @unique
+  paidAt           DateTime?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  invoice Invoice?
+  refunds Refund[]
+
+  @@index([userId, status])
+}
+
+model Invoice {
+  id           String   @id @default(uuid())
+  number       String   @unique // OP-2026-000001
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+  purchaseId   String   @unique
+  purchase     Purchase @relation(fields: [purchaseId], references: [id])
+  sellerTrn    String
+  description  String
+  subtotalFils Int
+  vatRateBps   Int
+  vatFils      Int
+  totalFils    Int
+  currency     String   @default("AED")
+  issuedAt     DateTime @default(now())
+}
+
+model InvoiceCounter {
+  year  Int @id
+  value Int @default(0)
+}
+
+enum RefundStatus {
+  REQUESTED
+  PROCESSING
+  SUCCEEDED
+  FAILED
+}
+
+model Refund {
+  id              String       @id @default(uuid())
+  purchaseId      String
+  purchase        Purchase     @relation(fields: [purchaseId], references: [id])
+  amountFils      Int
+  reason          String
+  status          RefundStatus @default(REQUESTED)
+  gatewayRefundId String?      @unique
+  createdByAdmin  String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+}
+
+// ───────────────────────────── Wallet ─────────────────────────────
+
+model Wallet {
+  id           String   @id @default(uuid())
+  userId       String   @unique
+  user         User     @relation(fields: [userId], references: [id])
+  balanceFils  Int      @default(0) // cached; source of truth = sum(ledger)
+  currency     String   @default("AED")
+  updatedAt    DateTime @updatedAt
+
+  entries WalletLedgerEntry[]
+}
+
+enum LedgerEntryType {
+  TOPUP
+  CARD_FUND
+  CARD_FUND_REVERSAL
+  CARD_CANCEL_RETURN
+  REFUND
+  ADJUSTMENT
+}
+
+model WalletLedgerEntry {
+  id             String          @id @default(uuid())
+  walletId       String
+  wallet         Wallet          @relation(fields: [walletId], references: [id])
+  type           LedgerEntryType
+  amountFils     Int             // signed: +credit / -debit
+  balanceAfter   Int
+  cardId         String?
+  purchaseId     String?
+  idempotencyKey String          @unique
+  memo           String?
+  createdAt      DateTime        @default(now())
+
+  @@index([walletId, createdAt])
+}
+
+// ───────────────────────────── Cards ─────────────────────────────
+
+enum CardStatus {
+  ACTIVE
+  FROZEN
+  CANCELLED
+}
+
+model Card {
+  id                   String     @id @default(uuid())
+  userId               String
+  user                 User       @relation(fields: [userId], references: [id])
+  nymcardCardId        String     @unique
+  label                String
+  last4                String     @db.Char(4)
+  expiryMonth          Int
+  expiryYear           Int
+  status               CardStatus @default(ACTIVE)
+  spendingLimitFils    Int?
+  availableBalanceFils Int        @default(0) // refreshed from NymCard; display only
+  cancelledAt          DateTime?
+  createdAt            DateTime   @default(now())
+  updatedAt            DateTime   @updatedAt
+
+  transactions CardTransaction[]
+
+  @@index([userId, status])
+}
+
+enum CardTxnType {
+  AUTHORIZATION
+  SETTLEMENT
+  REVERSAL
+  REFUND
+  DECLINE
+}
+
+enum CardTxnStatus {
+  PENDING
+  SETTLED
+  REVERSED
+  DECLINED
+}
+
+model CardTransaction {
+  id               String        @id @default(uuid())
+  cardId           String
+  card             Card          @relation(fields: [cardId], references: [id])
+  providerTxnId    String        @unique
+  type             CardTxnType
+  status           CardTxnStatus
+  amountFils       Int           // in billing currency (AED)
+  currency         String        @default("AED")
+  originalAmount   Int?          // minor units of merchant currency
+  originalCurrency String?
+  merchantName     String?
+  merchantCountry  String?
+  mcc              String?
+  declineReason    String?
+  occurredAt       DateTime
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  @@index([cardId, occurredAt])
+}
+
+// ───────────────────────────── Webhooks ─────────────────────────────
+
+model WebhookEvent {
+  id              String    @id @default(uuid())
+  provider        String    // "nymcard" | "checkoutcom" | "mock-gateway"
+  providerEventId String
+  eventType       String
+  payloadHash     String
+  payload         Json      // already redacted
+  receivedAt      DateTime  @default(now())
+  processedAt     DateTime?
+  attempts        Int       @default(0)
+  lastError       String?
+
+  @@unique([provider, providerEventId])
+  @@index([processedAt])
+}
+
+// ───────────────────────────── Notifications ─────────────────────────────
+
+enum NotificationType {
+  TRANSACTION
+  DECLINE
+  CARD_STATUS
+  CARD_CANCELLED
+  PURCHASE
+  KYC
+  SECURITY
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType
+  titleEn   String
+  titleAr   String
+  bodyEn    String
+  bodyAr    String
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+
+  @@index([userId, readAt])
+}
+
+// ───────────────────────────── Admin, audit, risk ─────────────────────────────
+
+enum AdminRole {
+  SUPER_ADMIN
+  SUPPORT
+  COMPLIANCE
+}
+
+model AdminUser {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  name         String
+  passwordHash String
+  totpSecret   String?   // encrypt at rest in production (KMS) — see docs/COMPLIANCE.md
+  totpEnabled  Boolean   @default(false)
+  role         AdminRole
+  active       Boolean   @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+
+  sessions AdminSession[]
+}
+
+model AdminSession {
+  id        String    @id @default(uuid())
+  adminId   String
+  admin     AdminUser @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  ip        String?
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+}
+
+enum ActorType {
+  USER
+  ADMIN
+  SYSTEM
+}
+
+model AuditLog {
+  id         String    @id @default(uuid())
+  actorType  ActorType
+  actorId    String?
+  action     String    // e.g. "card.freeze", "admin.kyc.approve"
+  targetType String?
+  targetId   String?
+  ip         String?
+  userAgent  String?
+  before     Json?
+  after      Json?
+  metadata   Json?
+  createdAt  DateTime  @default(now())
+
+  @@index([targetType, targetId])
+  @@index([actorType, actorId])
+  @@index([createdAt])
+}
+
+enum FlagStatus {
+  OPEN
+  REVIEWING
+  DISMISSED
+  ESCALATED
+}
+
+model SuspiciousActivityFlag {
+  id          String     @id @default(uuid())
+  userId      String
+  user        User       @relation(fields: [userId], references: [id])
+  cardId      String?
+  rule        String     // HIGH_AMOUNT | VELOCITY | DECLINES | RISKY_MCC
+  details     Json
+  status      FlagStatus @default(OPEN)
+  resolvedBy  String?
+  resolution  String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([status])
+}
+
+enum DisputeStatus {
+  OPEN
+  INVESTIGATING
+  RESOLVED_CUSTOMER
+  RESOLVED_MERCHANT
+  CLOSED
+}
+
+model Dispute {
+  id            String        @id @default(uuid())
+  userId        String
+  user          User          @relation(fields: [userId], references: [id])
+  transactionId String
+  reason        String
+  status        DisputeStatus @default(OPEN)
+  notes         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+model AppSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}

@@ -1,0 +1,34 @@
+{
+  "name": "onlinepay",
+  "private": true,
+  "version": "0.1.0",
+  "description": "OnlinePay — consumer virtual cards for the UAE, issued via NymCard",
+  "packageManager": "pnpm@10.28.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "turbo run dev --parallel",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "e2e": "pnpm --filter @onlinepay/web e2e",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "db:generate": "pnpm --filter @onlinepay/db generate",
+    "db:migrate": "pnpm --filter @onlinepay/db migrate:dev",
+    "db:deploy": "pnpm --filter @onlinepay/db migrate:deploy",
+    "db:seed": "pnpm --filter @onlinepay/db seed",
+    "infra:up": "docker compose up -d",
+    "infra:down": "docker compose down"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "eslint": "^9.17.0",
+    "prettier": "^3.4.2",
+    "turbo": "^2.3.3",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.18.2"
+  }
+}
