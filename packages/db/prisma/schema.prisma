@@ -486,6 +486,19 @@ model Dispute {
   updatedAt     DateTime      @updatedAt
 }
 
+// Stores the first response for an Idempotency-Key so retried requests are safe.
+model IdempotencyRecord {
+  key          String   @id
+  scope        String   // userId or "admin:<id>"
+  route        String
+  requestHash  String
+  statusCode   Int?
+  responseJson Json?
+  createdAt    DateTime @default(now())
+
+  @@index([createdAt])
+}
+
 model AppSetting {
   key       String   @id
   value     String
