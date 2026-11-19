@@ -28,7 +28,7 @@ const SENSITIVE_KEYS = new Set([
 ]);
 
 // 13–19 digit sequences, optionally separated by spaces or dashes (PAN-like).
-const PAN_PATTERN = /\b(?:\d[ -]?){13,19}\b/g;
+const PAN_PATTERN = /\b\d(?:[ -]?\d){12,18}\b/g;
 // Emirates ID: 784-YYYY-NNNNNNN-N
 const EID_PATTERN = /\b784-?\d{4}-?\d{7}-?\d\b/g;
 
