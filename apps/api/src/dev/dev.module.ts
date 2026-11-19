@@ -1,4 +1,12 @@
-import { Body, Controller, ForbiddenException, HttpCode, Module, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  ForbiddenException,
+  HttpCode,
+  Module,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import type { User } from '@onlinepay/db';
@@ -32,8 +40,12 @@ export class DevController {
 
   @Post('simulate-transaction')
   @HttpCode(200)
-  async simulate(@CurrentUser() user: User, @Body(new ZodPipe(simulateSchema)) body: z.infer<typeof simulateSchema>) {
-    if (env.NYMCARD_MODE !== 'mock' || env.NODE_ENV === 'production') throw new ForbiddenException();
+  async simulate(
+    @CurrentUser() user: User,
+    @Body(new ZodPipe(simulateSchema)) body: z.infer<typeof simulateSchema>,
+  ) {
+    if (env.NYMCARD_MODE !== 'mock' || env.NODE_ENV === 'production')
+      throw new ForbiddenException();
     const card = await this.prisma.card.findFirst({ where: { id: body.cardId, userId: user.id } });
     if (!card) throw new ForbiddenException();
 

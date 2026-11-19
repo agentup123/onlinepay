@@ -24,7 +24,9 @@ import { parseNymCardEvent } from './nymcard/nymcard.webhook';
 class WorkerModule {}
 
 async function bootstrap() {
-  const app = await NestFactory.createApplicationContext(WorkerModule, { logger: new RedactingLogger('Worker') });
+  const app = await NestFactory.createApplicationContext(WorkerModule, {
+    logger: new RedactingLogger('Worker'),
+  });
   const logger = new Logger('Worker');
   const prisma = app.get(PrismaService);
   const cardEvents = app.get(CardEventsService);
@@ -35,12 +37,18 @@ async function bootstrap() {
   const connection = app.get<Redis>(REDIS).duplicate({ maxRetriesPerRequest: null });
 
   /** Loads the stored webhook, runs the handler, and records the outcome. */
-  const processInbox = async (job: Job<{ webhookEventId: string }>, handle: (payload: Record<string, unknown>) => Promise<void>) => {
+  const processInbox = async (
+    job: Job<{ webhookEventId: string }>,
+    handle: (payload: Record<string, unknown>) => Promise<void>,
+  ) => {
     const ev = await prisma.webhookEvent.findUnique({ where: { id: job.data.webhookEventId } });
     if (!ev || ev.processedAt) return;
     try {
       await handle(ev.payload as Record<string, unknown>);
-      await prisma.webhookEvent.update({ where: { id: ev.id }, data: { processedAt: new Date(), attempts: { increment: 1 }, lastError: null } });
+      await prisma.webhookEvent.update({
+        where: { id: ev.id },
+        data: { processedAt: new Date(), attempts: { increment: 1 }, lastError: null },
+      });
     } catch (err) {
       await prisma.webhookEvent.update({
         where: { id: ev.id },
@@ -58,7 +66,8 @@ async function bootstrap() {
     ),
     new Worker(
       QUEUES.paymentEvents,
-      (job) => processInbox(job, (payload) => payments.handleGatewayEvent(gateway.parseWebhook(payload))),
+      (job) =>
+        processInbox(job, (payload) => payments.handleGatewayEvent(gateway.parseWebhook(payload))),
       { connection, concurrency: 5 },
     ),
     new Worker(
@@ -77,13 +86,23 @@ async function bootstrap() {
 
   for (const w of workers) {
     w.on('failed', (job, err) =>
-      logger.warn(`Job ${job?.queueName}/${job?.id} failed (attempt ${job?.attemptsMade}): ${err.message}`),
+      logger.warn(
+        `Job ${job?.queueName}/${job?.id} failed (attempt ${job?.attemptsMade}): ${err.message}`,
+      ),
     );
   }
 
   // Nightly at 02:00 Dubai time.
-  await queues.maintenance.upsertJobScheduler('reconcile-cards', { pattern: '0 2 * * *', tz: 'Asia/Dubai' }, { name: 'reconcile-cards' });
-  await queues.maintenance.upsertJobScheduler('cleanup', { pattern: '30 3 * * *', tz: 'Asia/Dubai' }, { name: 'cleanup' });
+  await queues.maintenance.upsertJobScheduler(
+    'reconcile-cards',
+    { pattern: '0 2 * * *', tz: 'Asia/Dubai' },
+    { name: 'reconcile-cards' },
+  );
+  await queues.maintenance.upsertJobScheduler(
+    'cleanup',
+    { pattern: '30 3 * * *', tz: 'Asia/Dubai' },
+    { name: 'cleanup' },
+  );
 
   logger.log(`Worker started (NymCard: ${env.NYMCARD_MODE}, gateway: ${env.PAYMENT_GATEWAY})`);
 

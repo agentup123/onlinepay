@@ -45,14 +45,21 @@ export default function CardPage({ params }: { params: Promise<{ id: string }> }
     e.preventDefault();
     const amount = String(new FormData(e.currentTarget).get('amount') ?? '');
     void run(() =>
-      api(`/cards/${id}/fund`, { body: { amountFils: parseAedToFils(amount) }, idempotencyKey: newIdempotencyKey() }),
+      api(`/cards/${id}/fund`, {
+        body: { amountFils: parseAedToFils(amount) },
+        idempotencyKey: newIdempotencyKey(),
+      }),
     );
   };
 
   const setLimit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const amount = String(new FormData(e.currentTarget).get('limit') ?? '').trim();
-    void run(() => api(`/cards/${id}/limit`, { body: { spendingLimitFils: amount ? parseAedToFils(amount) : null } }));
+    void run(() =>
+      api(`/cards/${id}/limit`, {
+        body: { spendingLimitFils: amount ? parseAedToFils(amount) : null },
+      }),
+    );
   };
 
   const reveal = () =>
@@ -88,11 +95,21 @@ export default function CardPage({ params }: { params: Promise<{ id: string }> }
         {!cancelled && (
           <div className="panel flex flex-wrap gap-2">
             {active ? (
-              <button className="btn-secondary flex-1" disabled={busy} onClick={() => run(() => api(`/cards/${id}/freeze`, { body: {} }))} data-testid="freeze">
+              <button
+                className="btn-secondary flex-1"
+                disabled={busy}
+                onClick={() => run(() => api(`/cards/${id}/freeze`, { body: {} }))}
+                data-testid="freeze"
+              >
                 {t('freeze')}
               </button>
             ) : (
-              <button className="btn-secondary flex-1" disabled={busy} onClick={() => run(() => api(`/cards/${id}/unfreeze`, { body: {} }))} data-testid="unfreeze">
+              <button
+                className="btn-secondary flex-1"
+                disabled={busy}
+                onClick={() => run(() => api(`/cards/${id}/unfreeze`, { body: {} }))}
+                data-testid="unfreeze"
+              >
                 {t('unfreeze')}
               </button>
             )}
@@ -102,7 +119,9 @@ export default function CardPage({ params }: { params: Promise<{ id: string }> }
               data-testid="cancel-card"
               onClick={() => {
                 if (window.confirm(t('cancelConfirm'))) {
-                  void run(() => api(`/cards/${id}/cancel`, { body: {}, idempotencyKey: newIdempotencyKey() }));
+                  void run(() =>
+                    api(`/cards/${id}/cancel`, { body: {}, idempotencyKey: newIdempotencyKey() }),
+                  );
                 }
               }}
             >
@@ -118,18 +137,39 @@ export default function CardPage({ params }: { params: Promise<{ id: string }> }
           <div className="grid gap-4 sm:grid-cols-2">
             <form onSubmit={fund} className="panel space-y-3">
               <h2 className="font-semibold">{t('fund')}</h2>
-              <label className="label" htmlFor="amount">{t('fundAmount')}</label>
-              <input className="input ltr-nums" id="amount" name="amount" inputMode="decimal" pattern="\d+(\.\d{1,2})?" required />
-              <button className="btn-primary w-full" disabled={busy}>{t('fund')}</button>
+              <label className="label" htmlFor="amount">
+                {t('fundAmount')}
+              </label>
+              <input
+                className="input ltr-nums"
+                id="amount"
+                name="amount"
+                inputMode="decimal"
+                pattern="\d+(\.\d{1,2})?"
+                required
+              />
+              <button className="btn-primary w-full" disabled={busy}>
+                {t('fund')}
+              </button>
             </form>
             <form onSubmit={setLimit} className="panel space-y-3">
               <h2 className="font-semibold">{t('limit')}</h2>
               <p className="text-sm text-slate-600">
                 {c.spendingLimitFils ? <Money fils={c.spendingLimitFils} /> : t('noLimit')}
               </p>
-              <label className="label" htmlFor="limit">{t('limitAmount')}</label>
-              <input className="input ltr-nums" id="limit" name="limit" inputMode="decimal" pattern="\d+(\.\d{1,2})?" />
-              <button className="btn-secondary w-full" disabled={busy}>{tc('save')}</button>
+              <label className="label" htmlFor="limit">
+                {t('limitAmount')}
+              </label>
+              <input
+                className="input ltr-nums"
+                id="limit"
+                name="limit"
+                inputMode="decimal"
+                pattern="\d+(\.\d{1,2})?"
+              />
+              <button className="btn-secondary w-full" disabled={busy}>
+                {tc('save')}
+              </button>
             </form>
           </div>
         )}
@@ -140,7 +180,13 @@ export default function CardPage({ params }: { params: Promise<{ id: string }> }
             {IS_DEV && active && (
               <button
                 className="text-xs text-brand-700 underline"
-                onClick={() => run(() => api('/dev/simulate-transaction', { body: { cardId: id, amountFils: 1999, merchantName: 'DEMO STORE' } }))}
+                onClick={() =>
+                  run(() =>
+                    api('/dev/simulate-transaction', {
+                      body: { cardId: id, amountFils: 1999, merchantName: 'DEMO STORE' },
+                    }),
+                  )
+                }
               >
                 {t('simulate')}
               </button>
@@ -155,11 +201,19 @@ export default function CardPage({ params }: { params: Promise<{ id: string }> }
                   <div>
                     <p className="font-medium">{x.merchantName ?? '—'}</p>
                     <p className="text-xs text-slate-500">
-                      {new Date(x.occurredAt).toLocaleString(locale === 'ar' ? 'ar-AE' : 'en-AE')} · {t(`txnStatus.${x.status}`)}
+                      {new Date(x.occurredAt).toLocaleString(locale === 'ar' ? 'ar-AE' : 'en-AE')} ·{' '}
+                      {t(`txnStatus.${x.status}`)}
                       {x.declineReason ? ` · ${x.declineReason}` : ''}
                     </p>
                   </div>
-                  <Money fils={x.amountFils} className={x.status === 'DECLINED' || x.status === 'REVERSED' ? 'text-slate-400 line-through' : 'font-semibold'} />
+                  <Money
+                    fils={x.amountFils}
+                    className={
+                      x.status === 'DECLINED' || x.status === 'REVERSED'
+                        ? 'text-slate-400 line-through'
+                        : 'font-semibold'
+                    }
+                  />
                 </li>
               ))}
             </ul>

@@ -1,7 +1,8 @@
 export const CARD_STATUSES = ['ACTIVE', 'FROZEN', 'CANCELLED'] as const;
 export type CardStatus = (typeof CARD_STATUSES)[number];
 
-export type CardAction = 'FREEZE' | 'UNFREEZE' | 'CANCEL' | 'FUND' | 'SET_LIMIT' | 'REVEAL' | 'RENAME';
+export type CardAction =
+  'FREEZE' | 'UNFREEZE' | 'CANCEL' | 'FUND' | 'SET_LIMIT' | 'REVEAL' | 'RENAME';
 
 /**
  * Allowed card actions per status. CANCELLED is terminal: nothing is allowed afterwards.

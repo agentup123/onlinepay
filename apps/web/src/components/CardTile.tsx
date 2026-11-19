@@ -12,7 +12,9 @@ export function CardTile({ card }: { card: Card }) {
     <Link
       href={`/dashboard/cards/${card.id}`}
       className={`block rounded-2xl p-5 text-white shadow-md transition hover:-translate-y-0.5 hover:shadow-lg ${
-        muted ? 'bg-gradient-to-br from-slate-500 to-slate-700' : 'bg-gradient-to-br from-brand-600 to-brand-900'
+        muted
+          ? 'bg-gradient-to-br from-slate-500 to-slate-700'
+          : 'bg-gradient-to-br from-brand-600 to-brand-900'
       }`}
       data-testid="card-tile"
     >

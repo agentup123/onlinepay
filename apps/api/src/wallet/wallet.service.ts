@@ -22,7 +22,11 @@ export class WalletService {
   constructor(private readonly prisma: PrismaService) {}
 
   async get(userId: string) {
-    const wallet = await this.prisma.wallet.upsert({ where: { userId }, update: {}, create: { userId } });
+    const wallet = await this.prisma.wallet.upsert({
+      where: { userId },
+      update: {},
+      create: { userId },
+    });
     const entries = await this.prisma.walletLedgerEntry.findMany({
       where: { walletId: wallet.id },
       orderBy: { createdAt: 'desc' },
@@ -44,7 +48,9 @@ export class WalletService {
     if (input.amountFils <= 0) throw new BadRequestException({ code: 'INVALID_AMOUNT' });
 
     const run = async (tx: Prisma.TransactionClient) => {
-      const existing = await tx.walletLedgerEntry.findUnique({ where: { idempotencyKey: input.idempotencyKey } });
+      const existing = await tx.walletLedgerEntry.findUnique({
+        where: { idempotencyKey: input.idempotencyKey },
+      });
       if (existing) return existing;
 
       const wallet = await tx.wallet.upsert({
@@ -55,10 +61,14 @@ export class WalletService {
 
       const delta = direction * input.amountFils;
       const updated = await tx.wallet.updateMany({
-        where: { id: wallet.id, ...(direction < 0 ? { balanceFils: { gte: input.amountFils } } : {}) },
+        where: {
+          id: wallet.id,
+          ...(direction < 0 ? { balanceFils: { gte: input.amountFils } } : {}),
+        },
         data: { balanceFils: { increment: delta } },
       });
-      if (updated.count !== 1) throw new BadRequestException({ code: 'INSUFFICIENT_WALLET_BALANCE' });
+      if (updated.count !== 1)
+        throw new BadRequestException({ code: 'INSUFFICIENT_WALLET_BALANCE' });
 
       const { balanceFils } = await tx.wallet.findUniqueOrThrow({ where: { id: wallet.id } });
       return tx.walletLedgerEntry.create({

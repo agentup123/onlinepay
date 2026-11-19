@@ -22,13 +22,24 @@ export default function Disputes() {
         empty="No disputes."
         rows={(data ?? []).map((d) => [
           d.user.email,
-          <code key="t" className="text-xs">{d.transactionId}</code>,
+          <code key="t" className="text-xs">
+            {d.transactionId}
+          </code>,
           d.reason,
           d.status,
           dt(d.createdAt),
-          <select key="s" className="rounded border text-xs" value="" onChange={(e) => e.target.value && setStatus(d.id, e.target.value)}>
+          <select
+            key="s"
+            className="rounded border text-xs"
+            value=""
+            onChange={(e) => e.target.value && setStatus(d.id, e.target.value)}
+          >
             <option value="">Set status…</option>
-            {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+            {STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
           </select>,
         ])}
       />

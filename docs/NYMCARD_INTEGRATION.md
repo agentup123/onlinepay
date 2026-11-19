@@ -2,10 +2,10 @@
 
 All issuer calls go through one interface, `NymCardClient` (`apps/api/src/nymcard/nymcard.types.ts`):
 
-| Implementation | When | File |
-| --- | --- | --- |
+| Implementation      | When                                 | File              |
+| ------------------- | ------------------------------------ | ----------------- |
 | `NymCardMockClient` | `NYMCARD_MODE=mock` (dev, tests, CI) | `nymcard.mock.ts` |
-| `NymCardHttpClient` | `sandbox` / `production` | `nymcard.http.ts` |
+| `NymCardHttpClient` | `sandbox` / `production`             | `nymcard.http.ts` |
 
 The rest of the app never sees NymCard's request/response shapes, so finishing the integration
 only touches `nymcard.http.ts` and `nymcard.webhook.ts`.
@@ -15,22 +15,22 @@ only touches `nymcard.http.ts` and `nymcard.webhook.ts`.
 None of the HTTP details below have been checked against the real API. Fill them in from
 NymCard's sandbox documentation / your onboarding pack:
 
-| # | Item | Where |
-| --- | --- | --- |
-| 1 | Base URLs (sandbox, production) | `.env` `NYMCARD_BASE_URL` |
-| 2 | Auth scheme (API key header vs OAuth client-credentials + token refresh) | `NymCardHttpClient.request` |
-| 3 | Create cardholder endpoint + required KYC fields | `createCardholder` |
-| 4 | Issue virtual card endpoint, product id, idempotency support | `createVirtualCard` |
-| 5 | Card object fields (`last4`, expiry, status values, balance) | `mapCard` |
-| 6 | Status change endpoint and status names (freeze/unfreeze/terminate) | `setCardStatus` |
-| 7 | Spending-limit / velocity-control endpoint | `setSpendingLimit` |
-| 8 | Load / unload funds endpoints (or account-to-card transfers) | `loadFunds`, `unloadFunds` |
-| 9 | **Secure card display** (iframe/SDK URL or token) and its origin for CSP | `createSecureDisplaySession`, `NYMCARD_SECURE_DISPLAY_ORIGIN` |
-| 10 | Transactions list endpoint + pagination | `listTransactions` |
-| 11 | Webhook signature header, algorithm, timestamp/replay protection | `verifyNymCardSignature`, `NYMCARD_WEBHOOK_SIGNATURE_HEADER` |
-| 12 | Webhook event names and payload fields | `parseNymCardEvent` |
-| 13 | Error codes worth mapping to user messages (insufficient funds, card blocked…) | `NymCardHttpClient.request` |
-| 14 | IP allow-listing of our egress IPs / their webhook source IPs | infra |
+| #   | Item                                                                           | Where                                                         |
+| --- | ------------------------------------------------------------------------------ | ------------------------------------------------------------- |
+| 1   | Base URLs (sandbox, production)                                                | `.env` `NYMCARD_BASE_URL`                                     |
+| 2   | Auth scheme (API key header vs OAuth client-credentials + token refresh)       | `NymCardHttpClient.request`                                   |
+| 3   | Create cardholder endpoint + required KYC fields                               | `createCardholder`                                            |
+| 4   | Issue virtual card endpoint, product id, idempotency support                   | `createVirtualCard`                                           |
+| 5   | Card object fields (`last4`, expiry, status values, balance)                   | `mapCard`                                                     |
+| 6   | Status change endpoint and status names (freeze/unfreeze/terminate)            | `setCardStatus`                                               |
+| 7   | Spending-limit / velocity-control endpoint                                     | `setSpendingLimit`                                            |
+| 8   | Load / unload funds endpoints (or account-to-card transfers)                   | `loadFunds`, `unloadFunds`                                    |
+| 9   | **Secure card display** (iframe/SDK URL or token) and its origin for CSP       | `createSecureDisplaySession`, `NYMCARD_SECURE_DISPLAY_ORIGIN` |
+| 10  | Transactions list endpoint + pagination                                        | `listTransactions`                                            |
+| 11  | Webhook signature header, algorithm, timestamp/replay protection               | `verifyNymCardSignature`, `NYMCARD_WEBHOOK_SIGNATURE_HEADER`  |
+| 12  | Webhook event names and payload fields                                         | `parseNymCardEvent`                                           |
+| 13  | Error codes worth mapping to user messages (insufficient funds, card blocked…) | `NymCardHttpClient.request`                                   |
+| 14  | IP allow-listing of our egress IPs / their webhook source IPs                  | infra                                                         |
 
 ## Webhook pipeline
 

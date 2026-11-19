@@ -19,7 +19,9 @@ const STATUS_STYLES: Record<CardStatus, string> = {
 export function StatusBadge({ status }: { status: CardStatus }) {
   const t = useTranslations('card.status');
   return (
-    <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ${STATUS_STYLES[status]}`}>
+    <span
+      className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ${STATUS_STYLES[status]}`}
+    >
       {t(status)}
     </span>
   );

@@ -1,16 +1,36 @@
 import type { ReactNode } from 'react';
 
-export function Table({ head, rows, empty = 'Nothing here.' }: { head: string[]; rows: ReactNode[][]; empty?: string }) {
+export function Table({
+  head,
+  rows,
+  empty = 'Nothing here.',
+}: {
+  head: string[];
+  rows: ReactNode[][];
+  empty?: string;
+}) {
   if (rows.length === 0) return <p className="py-6 text-sm text-slate-500">{empty}</p>;
   return (
     <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
       <table className="min-w-full text-sm">
         <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
-          <tr>{head.map((h) => <th key={h} className="px-3 py-2">{h}</th>)}</tr>
+          <tr>
+            {head.map((h) => (
+              <th key={h} className="px-3 py-2">
+                {h}
+              </th>
+            ))}
+          </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
           {rows.map((r, i) => (
-            <tr key={i}>{r.map((c, j) => <td key={j} className="px-3 py-2 align-top">{c}</td>)}</tr>
+            <tr key={i}>
+              {r.map((c, j) => (
+                <td key={j} className="px-3 py-2 align-top">
+                  {c}
+                </td>
+              ))}
+            </tr>
           ))}
         </tbody>
       </table>
@@ -18,7 +38,9 @@ export function Table({ head, rows, empty = 'Nothing here.' }: { head: string[];
   );
 }
 
-export function Btn(props: React.ButtonHTMLAttributes<HTMLButtonElement> & { tone?: 'danger' | 'default' }) {
+export function Btn(
+  props: React.ButtonHTMLAttributes<HTMLButtonElement> & { tone?: 'danger' | 'default' },
+) {
   const { tone = 'default', className = '', ...rest } = props;
   return (
     <button

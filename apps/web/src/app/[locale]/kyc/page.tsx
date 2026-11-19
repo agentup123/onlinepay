@@ -51,31 +51,65 @@ export default function KycPage() {
         {status === 'NOT_STARTED' || status === 'NEEDS_INFO' ? (
           <form onSubmit={submit} className="space-y-4">
             <p className="text-slate-600">{t('intro')}</p>
-            {status === 'NEEDS_INFO' && <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">{t('status.NEEDS_INFO')}</p>}
+            {status === 'NEEDS_INFO' && (
+              <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">
+                {t('status.NEEDS_INFO')}
+              </p>
+            )}
             <div>
-              <label className="label" htmlFor="documentType">{t('documentType')}</label>
-              <select className="input" id="documentType" name="documentType" defaultValue="EMIRATES_ID">
+              <label className="label" htmlFor="documentType">
+                {t('documentType')}
+              </label>
+              <select
+                className="input"
+                id="documentType"
+                name="documentType"
+                defaultValue="EMIRATES_ID"
+              >
                 <option value="EMIRATES_ID">{t('emiratesId')}</option>
                 <option value="PASSPORT">{t('passport')}</option>
               </select>
             </div>
             <div>
-              <label className="label" htmlFor="nationality">{t('nationality')}</label>
-              <input className="input uppercase" id="nationality" name="nationality" required minLength={2} maxLength={2} dir="ltr" />
+              <label className="label" htmlFor="nationality">
+                {t('nationality')}
+              </label>
+              <input
+                className="input uppercase"
+                id="nationality"
+                name="nationality"
+                required
+                minLength={2}
+                maxLength={2}
+                dir="ltr"
+              />
             </div>
             <div>
-              <label className="label" htmlFor="dateOfBirth">{t('dob')}</label>
-              <input className="input" id="dateOfBirth" name="dateOfBirth" type="date" required dir="ltr" />
+              <label className="label" htmlFor="dateOfBirth">
+                {t('dob')}
+              </label>
+              <input
+                className="input"
+                id="dateOfBirth"
+                name="dateOfBirth"
+                type="date"
+                required
+                dir="ltr"
+              />
             </div>
             <p className="text-xs text-slate-500">{t('privacyNote')}</p>
             <ErrorText error={error} />
-            <button className="btn-primary w-full" disabled={busy}>{t('start')}</button>
+            <button className="btn-primary w-full" disabled={busy}>
+              {t('start')}
+            </button>
           </form>
         ) : (
           <div className="space-y-4">
             <p data-testid="kyc-status">{t(`status.${status}`)}</p>
             {status === 'APPROVED' && (
-              <Link href="/dashboard" className="btn-primary w-full">{td('title')}</Link>
+              <Link href="/dashboard" className="btn-primary w-full">
+                {td('title')}
+              </Link>
             )}
           </div>
         )}

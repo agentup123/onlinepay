@@ -31,7 +31,14 @@ export interface CardTransaction {
 
 export interface Wallet {
   balanceFils: number;
-  entries: { id: string; type: string; amountFils: number; balanceAfter: number; memo: string | null; createdAt: string }[];
+  entries: {
+    id: string;
+    type: string;
+    amountFils: number;
+    balanceAfter: number;
+    memo: string | null;
+    createdAt: string;
+  }[];
 }
 
 export interface Invoice {

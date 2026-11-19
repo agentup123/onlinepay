@@ -20,7 +20,13 @@ export class WebhooksService {
     private readonly queues: QueueService,
   ) {}
 
-  async ingest(provider: WebhookProvider, providerEventId: string, eventType: string, rawBody: Buffer, payload: unknown) {
+  async ingest(
+    provider: WebhookProvider,
+    providerEventId: string,
+    eventType: string,
+    rawBody: Buffer,
+    payload: unknown,
+  ) {
     if (!providerEventId) {
       providerEventId = `hash:${sha256(rawBody)}`;
     }
@@ -45,7 +51,11 @@ export class WebhooksService {
     }
 
     const queue = provider === 'nymcard' ? this.queues.nymcardEvents : this.queues.paymentEvents;
-    await queue.add(eventType, { webhookEventId: eventRowId }, { ...DEFAULT_JOB_OPTS, jobId: eventRowId });
+    await queue.add(
+      eventType,
+      { webhookEventId: eventRowId },
+      { ...DEFAULT_JOB_OPTS, jobId: eventRowId },
+    );
     return { duplicate: false, id: eventRowId };
   }
 
@@ -53,7 +63,11 @@ export class WebhooksService {
   async retry(webhookEventId: string) {
     const ev = await this.prisma.webhookEvent.findUniqueOrThrow({ where: { id: webhookEventId } });
     const queue = ev.provider === 'nymcard' ? this.queues.nymcardEvents : this.queues.paymentEvents;
-    await queue.add(ev.eventType, { webhookEventId: ev.id }, { ...DEFAULT_JOB_OPTS, jobId: `${ev.id}:retry:${Date.now()}` });
+    await queue.add(
+      ev.eventType,
+      { webhookEventId: ev.id },
+      { ...DEFAULT_JOB_OPTS, jobId: `${ev.id}:retry:${Date.now()}` },
+    );
     return { ok: true };
   }
 }

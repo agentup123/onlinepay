@@ -43,7 +43,9 @@ export default function Landing({ params }: { params: Promise<{ locale: string }
         <h2 className="mb-5 text-2xl font-bold">{t('useCasesTitle')}</h2>
         <div className="grid gap-4 sm:grid-cols-2">
           {(['shopping', 'subscriptions', 'trials', 'privacy'] as const).map((k) => (
-            <div key={k} className="panel">{t(`useCases.${k}`)}</div>
+            <div key={k} className="panel">
+              {t(`useCases.${k}`)}
+            </div>
           ))}
         </div>
       </section>
@@ -53,7 +55,9 @@ export default function Landing({ params }: { params: Promise<{ locale: string }
         <ol className="grid gap-4 sm:grid-cols-3">
           {(['1', '2', '3'] as const).map((k) => (
             <li key={k} className="panel">
-              <span className="mb-2 flex h-8 w-8 items-center justify-center rounded-full bg-brand-100 font-bold text-brand-700">{k}</span>
+              <span className="mb-2 flex h-8 w-8 items-center justify-center rounded-full bg-brand-100 font-bold text-brand-700">
+                {k}
+              </span>
               {t(`how.${k}`)}
             </li>
           ))}

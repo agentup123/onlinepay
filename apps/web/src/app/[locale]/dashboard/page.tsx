@@ -51,31 +51,47 @@ export default function DashboardPage() {
           </p>
         </div>
         <Link href="/dashboard/wallet" className="panel !p-3 text-sm">
-          {t('walletBalance')}: <Money fils={wallet.data?.balanceFils ?? 0} className="font-semibold" />
+          {t('walletBalance')}:{' '}
+          <Money fils={wallet.data?.balanceFils ?? 0} className="font-semibold" />
         </Link>
       </div>
 
       {kyc.data && !kycApproved && (
         <div className="flex items-center justify-between gap-3 rounded-2xl bg-amber-50 p-4 text-amber-900">
           <span>{t('kycRequired')}</span>
-          <Link className="btn-primary" href="/kyc">{t('verifyNow')}</Link>
+          <Link className="btn-primary" href="/kyc">
+            {t('verifyNow')}
+          </Link>
         </div>
       )}
 
       {kycApproved && quota.remaining === 0 && (
         <div className="flex items-center justify-between gap-3 rounded-2xl bg-brand-50 p-4">
           <span>{quota.purchased > 0 ? t('bundleNeeded') : ''}</span>
-          <Link className="btn-primary" href="/checkout" data-testid="buy-bundle">{t('buyBundle')}</Link>
+          <Link className="btn-primary" href="/checkout" data-testid="buy-bundle">
+            {t('buyBundle')}
+          </Link>
         </div>
       )}
 
       {kycApproved && quota.remaining > 0 && (
         <form onSubmit={create} className="panel flex flex-col gap-3 sm:flex-row sm:items-end">
           <div className="flex-1">
-            <label className="label" htmlFor="label">{t('cardLabel')}</label>
-            <input className="input" id="label" name="label" required maxLength={40} placeholder={t('cardLabelPlaceholder')} />
+            <label className="label" htmlFor="label">
+              {t('cardLabel')}
+            </label>
+            <input
+              className="input"
+              id="label"
+              name="label"
+              required
+              maxLength={40}
+              placeholder={t('cardLabelPlaceholder')}
+            />
           </div>
-          <button className="btn-primary" disabled={busy} data-testid="create-card">{t('createCard')}</button>
+          <button className="btn-primary" disabled={busy} data-testid="create-card">
+            {t('createCard')}
+          </button>
         </form>
       )}
       <ErrorText error={error} />
@@ -92,7 +108,11 @@ export default function DashboardPage() {
 
       {list.some((c) => c.status === 'CANCELLED') && (
         <label className="flex items-center gap-2 text-sm text-slate-600">
-          <input type="checkbox" checked={showCancelled} onChange={(e) => setShowCancelled(e.target.checked)} />
+          <input
+            type="checkbox"
+            checked={showCancelled}
+            onChange={(e) => setShowCancelled(e.target.checked)}
+          />
           {t('showCancelled')}
         </label>
       )}

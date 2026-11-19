@@ -31,14 +31,14 @@ flowchart LR
   W -. iframe .-> SD[NymCard secure card display]
 ```
 
-| Path | What it is |
-| --- | --- |
-| `apps/web` | Consumer site and dashboard (Next.js App Router, `next-intl`, Tailwind, RTL) |
-| `apps/admin` | Internal admin panel: users, KYC queue, cards, refunds, monitoring, disputes, audit |
-| `apps/api` | NestJS API (`src/main.ts`) **and** BullMQ worker (`src/worker.ts`) |
-| `packages/db` | Prisma schema, migrations, seed |
+| Path              | What it is                                                                          |
+| ----------------- | ----------------------------------------------------------------------------------- |
+| `apps/web`        | Consumer site and dashboard (Next.js App Router, `next-intl`, Tailwind, RTL)        |
+| `apps/admin`      | Internal admin panel: users, KYC queue, cards, refunds, monitoring, disputes, audit |
+| `apps/api`        | NestJS API (`src/main.ts`) **and** BullMQ worker (`src/worker.ts`)                  |
+| `packages/db`     | Prisma schema, migrations, seed                                                     |
 | `packages/shared` | Money (integer fils), VAT, card state machine, bundle quota, redaction, Zod schemas |
-| `docs/` | Architecture, decisions, NymCard integration, compliance |
+| `docs/`           | Architecture, decisions, NymCard integration, compliance                            |
 
 Key properties:
 
@@ -83,25 +83,25 @@ Demo login: `demo@onlinepay.local` — the SMS code appears in Mailpit and the A
 
 ## Scripts
 
-| Command | |
-| --- | --- |
-| `pnpm dev` | All apps in watch mode |
-| `pnpm build` / `pnpm typecheck` / `pnpm lint` / `pnpm test` | Across the monorepo (Turborepo) |
-| `pnpm e2e` | Playwright core flow (needs the stack running) |
-| `pnpm db:migrate` / `db:deploy` / `db:seed` | Prisma |
+| Command                                                     |                                                |
+| ----------------------------------------------------------- | ---------------------------------------------- |
+| `pnpm dev`                                                  | All apps in watch mode                         |
+| `pnpm build` / `pnpm typecheck` / `pnpm lint` / `pnpm test` | Across the monorepo (Turborepo)                |
+| `pnpm e2e`                                                  | Playwright core flow (needs the stack running) |
+| `pnpm db:migrate` / `db:deploy` / `db:seed`                 | Prisma                                         |
 
 ## Configuration
 
 All settings live in `.env` (see `.env.example` for every variable). The important switches:
 
-| Variable | Values | Notes |
-| --- | --- | --- |
-| `NYMCARD_MODE` | `mock` \| `sandbox` \| `production` | Mock state is kept in Redis |
-| `PAYMENT_GATEWAY` | `mock` \| `checkoutcom` | |
-| `KYC_PROVIDER` | `mock` | Add a real adapter in `apps/api/src/kyc/kyc.provider.ts` |
-| `BUNDLE_MODE` | `one_time` \| `subscription` | Subscription is not implemented yet |
-| `CANCELLED_CARDS_COUNT_AGAINST_BUNDLE` | `true` \| `false` | |
-| `CANCELLED_CARD_BALANCE_DESTINATION` | `wallet` \| `source` | `source` not implemented yet |
+| Variable                               | Values                              | Notes                                                    |
+| -------------------------------------- | ----------------------------------- | -------------------------------------------------------- |
+| `NYMCARD_MODE`                         | `mock` \| `sandbox` \| `production` | Mock state is kept in Redis                              |
+| `PAYMENT_GATEWAY`                      | `mock` \| `checkoutcom`             |                                                          |
+| `KYC_PROVIDER`                         | `mock`                              | Add a real adapter in `apps/api/src/kyc/kyc.provider.ts` |
+| `BUNDLE_MODE`                          | `one_time` \| `subscription`        | Subscription is not implemented yet                      |
+| `CANCELLED_CARDS_COUNT_AGAINST_BUNDLE` | `true` \| `false`                   |                                                          |
+| `CANCELLED_CARD_BALANCE_DESTINATION`   | `wallet` \| `source`                | `source` not implemented yet                             |
 
 The API refuses to start in `NODE_ENV=production` with any mock provider or without secure cookies.
 

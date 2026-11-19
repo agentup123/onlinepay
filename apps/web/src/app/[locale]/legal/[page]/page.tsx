@@ -33,7 +33,11 @@ const OUTLINE: Record<Page, string[]> = {
   ],
 };
 
-export default async function LegalPage({ params }: { params: Promise<{ locale: string; page: string }> }) {
+export default async function LegalPage({
+  params,
+}: {
+  params: Promise<{ locale: string; page: string }>;
+}) {
   const { locale, page } = await params;
   if (!PAGES.includes(page as Page)) notFound();
   setRequestLocale(locale);
@@ -42,7 +46,9 @@ export default async function LegalPage({ params }: { params: Promise<{ locale: 
   return (
     <article className="panel mx-auto max-w-3xl space-y-4">
       <h1 className="text-2xl font-bold">{t(page as Page)}</h1>
-      <p className="rounded-xl bg-amber-50 p-3 text-sm font-semibold text-amber-800">{t('reviewNotice')}</p>
+      <p className="rounded-xl bg-amber-50 p-3 text-sm font-semibold text-amber-800">
+        {t('reviewNotice')}
+      </p>
       <ul className="list-disc space-y-2 ps-6 text-slate-700" dir="ltr">
         {OUTLINE[page as Page].map((line) => (
           <li key={line}>{line}</li>

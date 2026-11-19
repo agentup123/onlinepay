@@ -43,11 +43,18 @@ export class CardEventsService {
       if (card.status === event.status || card.status === 'CANCELLED') return;
       await this.prisma.card.update({
         where: { id: card.id },
-        data: { status: event.status, cancelledAt: event.status === 'CANCELLED' ? new Date() : undefined },
+        data: {
+          status: event.status,
+          cancelledAt: event.status === 'CANCELLED' ? new Date() : undefined,
+        },
       });
       await this.audit.log({
-        actorType: 'SYSTEM', action: 'card.status_synced', targetType: 'Card', targetId: card.id,
-        before: { status: card.status }, after: { status: event.status },
+        actorType: 'SYSTEM',
+        action: 'card.status_synced',
+        targetType: 'Card',
+        targetId: card.id,
+        before: { status: card.status },
+        after: { status: event.status },
       });
       return;
     }
@@ -55,7 +62,9 @@ export class CardEventsService {
     // ── Transaction events ──
     const type = event.stage as CardTxnType;
     const status = STATUS_BY_STAGE[type];
-    const existing = await this.prisma.cardTransaction.findUnique({ where: { providerTxnId: event.transactionId } });
+    const existing = await this.prisma.cardTransaction.findUnique({
+      where: { providerTxnId: event.transactionId },
+    });
     // Do not move a settled/reversed transaction back to pending if events arrive out of order.
     if (existing && existing.status !== 'PENDING' && status === 'PENDING') return;
 
@@ -77,7 +86,10 @@ export class CardEventsService {
       create: { ...data, cardId: card.id, providerTxnId: event.transactionId },
     });
     if (event.availableBalanceFils !== undefined) {
-      await this.prisma.card.update({ where: { id: card.id }, data: { availableBalanceFils: event.availableBalanceFils } });
+      await this.prisma.card.update({
+        where: { id: card.id },
+        data: { availableBalanceFils: event.availableBalanceFils },
+      });
     }
 
     if (!existing && (type === 'AUTHORIZATION' || type === 'DECLINE')) {
@@ -87,26 +99,53 @@ export class CardEventsService {
         userId: card.userId,
         type: type === 'DECLINE' ? 'DECLINE' : 'TRANSACTION',
         email: type === 'DECLINE',
-        en: type === 'DECLINE'
-          ? { title: 'Payment declined', body: `${amount} at ${merchant} on "${card.label}" was declined${event.declineReason ? `: ${event.declineReason}` : ''}.` }
-          : { title: 'New transaction', body: `${amount} at ${merchant} on "${card.label}".` },
-        ar: type === 'DECLINE'
-          ? { title: 'تم رفض الدفعة', body: `تم رفض ${formatFils(event.amountFils, 'ar')} لدى ${merchant} على البطاقة "${card.label}".` }
-          : { title: 'معاملة جديدة', body: `${formatFils(event.amountFils, 'ar')} لدى ${merchant} على البطاقة "${card.label}".` },
+        en:
+          type === 'DECLINE'
+            ? {
+                title: 'Payment declined',
+                body: `${amount} at ${merchant} on "${card.label}" was declined${event.declineReason ? `: ${event.declineReason}` : ''}.`,
+              }
+            : { title: 'New transaction', body: `${amount} at ${merchant} on "${card.label}".` },
+        ar:
+          type === 'DECLINE'
+            ? {
+                title: 'تم رفض الدفعة',
+                body: `تم رفض ${formatFils(event.amountFils, 'ar')} لدى ${merchant} على البطاقة "${card.label}".`,
+              }
+            : {
+                title: 'معاملة جديدة',
+                body: `${formatFils(event.amountFils, 'ar')} لدى ${merchant} على البطاقة "${card.label}".`,
+              },
       });
     }
 
     if (!existing) await this.monitor(card.id, card.userId, type, event.amountFils, event.mcc);
   }
 
-  private async monitor(cardId: string, userId: string, stage: CardTxnType, amountFils: number, mcc?: string) {
-    const cardIds = (await this.prisma.card.findMany({ where: { userId }, select: { id: true } })).map((c) => c.id);
+  private async monitor(
+    cardId: string,
+    userId: string,
+    stage: CardTxnType,
+    amountFils: number,
+    mcc?: string,
+  ) {
+    const cardIds = (
+      await this.prisma.card.findMany({ where: { userId }, select: { id: true } })
+    ).map((c) => c.id);
     const [authsLast10Min, declinesLastHour] = await Promise.all([
       this.prisma.cardTransaction.count({
-        where: { cardId: { in: cardIds }, type: 'AUTHORIZATION', createdAt: { gt: new Date(Date.now() - 10 * 60_000) } },
+        where: {
+          cardId: { in: cardIds },
+          type: 'AUTHORIZATION',
+          createdAt: { gt: new Date(Date.now() - 10 * 60_000) },
+        },
       }),
       this.prisma.cardTransaction.count({
-        where: { cardId: { in: cardIds }, type: 'DECLINE', createdAt: { gt: new Date(Date.now() - 60 * 60_000) } },
+        where: {
+          cardId: { in: cardIds },
+          type: 'DECLINE',
+          createdAt: { gt: new Date(Date.now() - 60 * 60_000) },
+        },
       }),
     ]);
     const hits = evaluateRules(

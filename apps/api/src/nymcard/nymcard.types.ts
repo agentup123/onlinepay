@@ -48,7 +48,11 @@ export interface IssuerTransaction {
 
 export interface NymCardClient {
   createCardholder(input: CreateCardholderInput): Promise<{ cardholderId: string }>;
-  createVirtualCard(input: { cardholderId: string; label: string; idempotencyKey: string }): Promise<IssuerCard>;
+  createVirtualCard(input: {
+    cardholderId: string;
+    label: string;
+    idempotencyKey: string;
+  }): Promise<IssuerCard>;
   getCard(cardId: string): Promise<IssuerCard>;
   setCardStatus(cardId: string, status: IssuerCardStatus, reason?: string): Promise<void>;
   setSpendingLimit(cardId: string, limitFils: number | null): Promise<void>;

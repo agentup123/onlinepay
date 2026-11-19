@@ -17,7 +17,9 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
   if (!inv) return null;
 
   const row = (label: string, value: React.ReactNode, strong = false) => (
-    <div className={`flex justify-between py-2 ${strong ? 'border-t border-slate-300 font-bold' : ''}`}>
+    <div
+      className={`flex justify-between py-2 ${strong ? 'border-t border-slate-300 font-bold' : ''}`}
+    >
       <span>{label}</span>
       <span>{value}</span>
     </div>
@@ -33,7 +35,8 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
               {t('number')}: <span className="ltr-nums">{inv.number}</span>
             </p>
             <p className="text-sm text-slate-500">
-              {t('date')}: {new Date(inv.issuedAt).toLocaleDateString(locale === 'ar' ? 'ar-AE' : 'en-AE')}
+              {t('date')}:{' '}
+              {new Date(inv.issuedAt).toLocaleDateString(locale === 'ar' ? 'ar-AE' : 'en-AE')}
             </p>
           </div>
           <p className="text-lg font-bold text-brand-700">{tc('appName')}</p>
@@ -42,7 +45,9 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
           <div>
             <p className="font-semibold">{t('seller')}</p>
             <p>OnlinePay</p>
-            <p>{t('trn')}: <span className="ltr-nums">{inv.sellerTrn}</span></p>
+            <p>
+              {t('trn')}: <span className="ltr-nums">{inv.sellerTrn}</span>
+            </p>
           </div>
           <div>
             <p className="font-semibold">{t('buyer')}</p>
@@ -57,7 +62,9 @@ export default function InvoicePage({ params }: { params: Promise<{ id: string }
           {row(t('total'), <Money fils={inv.totalFils} />, true)}
         </div>
       </div>
-      <button className="btn-secondary no-print" onClick={() => window.print()}>{t('print')}</button>
+      <button className="btn-secondary no-print" onClick={() => window.print()}>
+        {t('print')}
+      </button>
     </div>
   );
 }

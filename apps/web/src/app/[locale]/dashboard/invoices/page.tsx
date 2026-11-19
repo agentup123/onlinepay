@@ -22,10 +22,17 @@ export default function InvoicesPage() {
           <ul className="divide-y divide-slate-100">
             {data!.map((inv) => (
               <li key={inv.id}>
-                <Link href={`/dashboard/invoices/${inv.id}`} className="flex justify-between py-3 text-sm hover:bg-slate-50">
+                <Link
+                  href={`/dashboard/invoices/${inv.id}`}
+                  className="flex justify-between py-3 text-sm hover:bg-slate-50"
+                >
                   <span>
                     <span className="ltr-nums font-medium">{inv.number}</span>
-                    <span className="block text-xs text-slate-500">{new Date(inv.issuedAt).toLocaleDateString(locale === 'ar' ? 'ar-AE' : 'en-AE')}</span>
+                    <span className="block text-xs text-slate-500">
+                      {new Date(inv.issuedAt).toLocaleDateString(
+                        locale === 'ar' ? 'ar-AE' : 'en-AE',
+                      )}
+                    </span>
                   </span>
                   <Money fils={inv.totalFils} className="font-semibold" />
                 </Link>

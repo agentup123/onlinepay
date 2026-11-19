@@ -10,12 +10,18 @@ export function Header() {
   const locale = useLocale();
   const pathname = usePathname();
   const router = useRouter();
-  const inApp = pathname.startsWith('/dashboard') || pathname.startsWith('/kyc') || pathname.startsWith('/checkout');
+  const inApp =
+    pathname.startsWith('/dashboard') ||
+    pathname.startsWith('/kyc') ||
+    pathname.startsWith('/checkout');
   const otherLocale = locale === 'ar' ? 'en' : 'ar';
 
   const switchLocale = async () => {
     router.replace(pathname, { locale: otherLocale });
-    if (inApp) await api('/me/preferences', { method: 'PATCH', body: { locale: otherLocale } }).catch(() => undefined);
+    if (inApp)
+      await api('/me/preferences', { method: 'PATCH', body: { locale: otherLocale } }).catch(
+        () => undefined,
+      );
   };
 
   const logout = async () => {
@@ -32,19 +38,50 @@ export function Header() {
         <nav className="flex items-center gap-1 text-sm sm:gap-3">
           {inApp ? (
             <>
-              <Link className="hidden rounded-lg px-2 py-1 hover:bg-slate-100 sm:inline" href="/dashboard">{t('dashboard')}</Link>
-              <Link className="hidden rounded-lg px-2 py-1 hover:bg-slate-100 sm:inline" href="/dashboard/wallet">{t('wallet')}</Link>
-              <Link className="hidden rounded-lg px-2 py-1 hover:bg-slate-100 sm:inline" href="/dashboard/invoices">{t('invoices')}</Link>
-              <Link className="rounded-lg px-2 py-1 hover:bg-slate-100" href="/dashboard/notifications" aria-label={t('notifications')}>🔔</Link>
-              <button className="rounded-lg px-2 py-1 hover:bg-slate-100" onClick={logout}>{t('logout')}</button>
+              <Link
+                className="hidden rounded-lg px-2 py-1 hover:bg-slate-100 sm:inline"
+                href="/dashboard"
+              >
+                {t('dashboard')}
+              </Link>
+              <Link
+                className="hidden rounded-lg px-2 py-1 hover:bg-slate-100 sm:inline"
+                href="/dashboard/wallet"
+              >
+                {t('wallet')}
+              </Link>
+              <Link
+                className="hidden rounded-lg px-2 py-1 hover:bg-slate-100 sm:inline"
+                href="/dashboard/invoices"
+              >
+                {t('invoices')}
+              </Link>
+              <Link
+                className="rounded-lg px-2 py-1 hover:bg-slate-100"
+                href="/dashboard/notifications"
+                aria-label={t('notifications')}
+              >
+                🔔
+              </Link>
+              <button className="rounded-lg px-2 py-1 hover:bg-slate-100" onClick={logout}>
+                {t('logout')}
+              </button>
             </>
           ) : (
             <>
-              <Link className="rounded-lg px-2 py-1 hover:bg-slate-100" href="/login">{t('login')}</Link>
-              <Link className="btn-primary" href="/signup">{t('signup')}</Link>
+              <Link className="rounded-lg px-2 py-1 hover:bg-slate-100" href="/login">
+                {t('login')}
+              </Link>
+              <Link className="btn-primary" href="/signup">
+                {t('signup')}
+              </Link>
             </>
           )}
-          <button className="rounded-lg px-2 py-1 font-medium hover:bg-slate-100" onClick={switchLocale} lang={otherLocale}>
+          <button
+            className="rounded-lg px-2 py-1 font-medium hover:bg-slate-100"
+            onClick={switchLocale}
+            lang={otherLocale}
+          >
             {t('language')}
           </button>
         </nav>

@@ -32,26 +32,48 @@ export class AdminAuthService {
   async login(email: string, password: string, totp: string, meta: RequestMeta) {
     const admin = await this.prisma.adminUser.findUnique({ where: { email: email.toLowerCase() } });
     // Always run bcrypt to keep timing uniform for unknown emails.
-    const hash = admin?.passwordHash ?? '$2a$12$C6UzMDM.H6dfI/f/IKcEeO2ZTYV5RbyGQpWuQKu1jGa0lcj3cT2B6';
+    const hash =
+      admin?.passwordHash ?? '$2a$12$C6UzMDM.H6dfI/f/IKcEeO2ZTYV5RbyGQpWuQKu1jGa0lcj3cT2B6';
     const passwordOk = await bcrypt.compare(password, hash);
-    const totpOk = !!admin?.totpSecret && authenticator.verify({ token: totp, secret: admin.totpSecret });
+    const totpOk =
+      !!admin?.totpSecret && authenticator.verify({ token: totp, secret: admin.totpSecret });
 
     if (!admin || !admin.active || !passwordOk || !totpOk) {
-      await this.audit.log({ actorType: 'ADMIN', actorId: admin?.id, action: 'admin.login_failed', metadata: { email }, meta });
+      await this.audit.log({
+        actorType: 'ADMIN',
+        actorId: admin?.id,
+        action: 'admin.login_failed',
+        metadata: { email },
+        meta,
+      });
       throw new UnauthorizedException({ code: 'INVALID_CREDENTIALS' });
     }
 
     const token = randomToken();
     await this.prisma.adminSession.create({
-      data: { adminId: admin.id, tokenHash: sha256(token), ip: meta.ip, expiresAt: new Date(Date.now() + ADMIN_SESSION_TTL_MS) },
+      data: {
+        adminId: admin.id,
+        tokenHash: sha256(token),
+        ip: meta.ip,
+        expiresAt: new Date(Date.now() + ADMIN_SESSION_TTL_MS),
+      },
     });
-    await this.prisma.adminUser.update({ where: { id: admin.id }, data: { lastLoginAt: new Date() } });
+    await this.prisma.adminUser.update({
+      where: { id: admin.id },
+      data: { lastLoginAt: new Date() },
+    });
     await this.audit.log({ actorType: 'ADMIN', actorId: admin.id, action: 'admin.login', meta });
-    return { token, admin: { id: admin.id, name: admin.name, email: admin.email, role: admin.role } };
+    return {
+      token,
+      admin: { id: admin.id, name: admin.name, email: admin.email, role: admin.role },
+    };
   }
 
   async logout(token: string) {
-    await this.prisma.adminSession.updateMany({ where: { tokenHash: sha256(token) }, data: { revokedAt: new Date() } });
+    await this.prisma.adminSession.updateMany({
+      where: { tokenHash: sha256(token) },
+      data: { revokedAt: new Date() },
+    });
   }
 }
 

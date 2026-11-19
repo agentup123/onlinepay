@@ -15,7 +15,12 @@ import {
 import { Throttle } from '@nestjs/throttler';
 import { z } from 'zod';
 import type { User } from '@onlinepay/db';
-import { createCardSchema, fundCardSchema, renameCardSchema, setLimitSchema } from '@onlinepay/shared';
+import {
+  createCardSchema,
+  fundCardSchema,
+  renameCardSchema,
+  setLimitSchema,
+} from '@onlinepay/shared';
 import { SessionGuard } from '../auth/session.guard';
 import { ZodPipe } from '../common/zod.pipe';
 import { CurrentUser, Meta, RequestMeta } from '../common/request';
@@ -73,14 +78,22 @@ export class CardsController {
   @Post(':id/freeze')
   @HttpCode(200)
   @Throttle(CARD_ACTIONS)
-  freeze(@CurrentUser() user: User, @Param('id', ParseUUIDPipe) id: string, @Meta() meta: RequestMeta) {
+  freeze(
+    @CurrentUser() user: User,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Meta() meta: RequestMeta,
+  ) {
     return this.cards.setFrozen({ type: 'USER', id: user.id }, user.id, id, true, meta);
   }
 
   @Post(':id/unfreeze')
   @HttpCode(200)
   @Throttle(CARD_ACTIONS)
-  unfreeze(@CurrentUser() user: User, @Param('id', ParseUUIDPipe) id: string, @Meta() meta: RequestMeta) {
+  unfreeze(
+    @CurrentUser() user: User,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Meta() meta: RequestMeta,
+  ) {
     return this.cards.setFrozen({ type: 'USER', id: user.id }, user.id, id, false, meta);
   }
 
@@ -88,7 +101,11 @@ export class CardsController {
   @HttpCode(200)
   @Idempotent()
   @Throttle(CARD_ACTIONS)
-  cancel(@CurrentUser() user: User, @Param('id', ParseUUIDPipe) id: string, @Meta() meta: RequestMeta) {
+  cancel(
+    @CurrentUser() user: User,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Meta() meta: RequestMeta,
+  ) {
     return this.cards.cancel({ type: 'USER', id: user.id }, user.id, id, meta);
   }
 
@@ -100,7 +117,13 @@ export class CardsController {
     @Body(new ZodPipe(setLimitSchema)) body: z.infer<typeof setLimitSchema>,
     @Meta() meta: RequestMeta,
   ) {
-    return this.cards.setLimit({ type: 'USER', id: user.id }, user.id, id, body.spendingLimitFils, meta);
+    return this.cards.setLimit(
+      { type: 'USER', id: user.id },
+      user.id,
+      id,
+      body.spendingLimitFils,
+      meta,
+    );
   }
 
   @Post(':id/fund')
@@ -120,7 +143,11 @@ export class CardsController {
   @Post(':id/reveal')
   @HttpCode(200)
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
-  reveal(@CurrentUser() user: User, @Param('id', ParseUUIDPipe) id: string, @Meta() meta: RequestMeta) {
+  reveal(
+    @CurrentUser() user: User,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Meta() meta: RequestMeta,
+  ) {
     return this.cards.reveal(user.id, id, meta);
   }
 }

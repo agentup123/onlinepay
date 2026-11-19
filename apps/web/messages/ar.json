@@ -124,7 +124,12 @@
     "noTransactions": "لا توجد معاملات بعد.",
     "dispute": "الإبلاغ عن مشكلة",
     "simulate": "محاكاة عملية شراء تجريبية (للتطوير فقط)",
-    "txnStatus": { "PENDING": "قيد المعالجة", "SETTLED": "مكتملة", "REVERSED": "معكوسة", "DECLINED": "مرفوضة" }
+    "txnStatus": {
+      "PENDING": "قيد المعالجة",
+      "SETTLED": "مكتملة",
+      "REVERSED": "معكوسة",
+      "DECLINED": "مرفوضة"
+    }
   },
   "wallet": {
     "title": "المحفظة",

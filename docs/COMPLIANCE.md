@@ -55,19 +55,19 @@
 
 ## Application security controls in this codebase
 
-| Control | Where |
-| --- | --- |
-| Passwordless OTP auth, hashed OTPs (HMAC + pepper), 5-min expiry, 5 attempts, send limits | `auth/otp.service.ts` |
-| Opaque session tokens stored as SHA-256, httpOnly + SameSite cookies, revocation | `auth/` |
-| Admin: bcrypt password + TOTP, 8-hour sessions, SameSite=Strict, role-based access | `admin/admin-auth.ts` |
-| CSRF: Origin/Referer check on all mutating cookie routes | `common/origin.middleware.ts` |
-| Rate limiting (global + stricter on auth/card actions) | `@nestjs/throttler` |
-| Idempotency keys on purchases, card create/fund/cancel | `common/idempotency.interceptor.ts` |
-| Atomic wallet ledger, never negative, idempotent entries | `wallet/wallet.service.ts` |
-| Per-user advisory lock prevents exceeding bundle quota under concurrency | `cards/cards.service.ts` |
-| Signed, idempotent webhooks; amount check before granting value | `webhooks/`, `payments/payments.service.ts` |
-| Audit log for every card, money, KYC and admin action | `common/audit.service.ts` |
-| Security headers (helmet, CSP, HSTS), mock providers blocked in production | `main.ts`, `next.config.mjs`, `config/env.ts` |
+| Control                                                                                   | Where                                         |
+| ----------------------------------------------------------------------------------------- | --------------------------------------------- |
+| Passwordless OTP auth, hashed OTPs (HMAC + pepper), 5-min expiry, 5 attempts, send limits | `auth/otp.service.ts`                         |
+| Opaque session tokens stored as SHA-256, httpOnly + SameSite cookies, revocation          | `auth/`                                       |
+| Admin: bcrypt password + TOTP, 8-hour sessions, SameSite=Strict, role-based access        | `admin/admin-auth.ts`                         |
+| CSRF: Origin/Referer check on all mutating cookie routes                                  | `common/origin.middleware.ts`                 |
+| Rate limiting (global + stricter on auth/card actions)                                    | `@nestjs/throttler`                           |
+| Idempotency keys on purchases, card create/fund/cancel                                    | `common/idempotency.interceptor.ts`           |
+| Atomic wallet ledger, never negative, idempotent entries                                  | `wallet/wallet.service.ts`                    |
+| Per-user advisory lock prevents exceeding bundle quota under concurrency                  | `cards/cards.service.ts`                      |
+| Signed, idempotent webhooks; amount check before granting value                           | `webhooks/`, `payments/payments.service.ts`   |
+| Audit log for every card, money, KYC and admin action                                     | `common/audit.service.ts`                     |
+| Security headers (helmet, CSP, HSTS), mock providers blocked in production                | `main.ts`, `next.config.mjs`, `config/env.ts` |
 
 ## Before production
 

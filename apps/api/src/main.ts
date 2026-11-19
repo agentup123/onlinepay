@@ -26,7 +26,11 @@ async function bootstrap() {
   if (env.NODE_ENV !== 'production') {
     const doc = SwaggerModule.createDocument(
       app,
-      new DocumentBuilder().setTitle('OnlinePay API').setVersion('0.1.0').addCookieAuth('op_session').build(),
+      new DocumentBuilder()
+        .setTitle('OnlinePay API')
+        .setVersion('0.1.0')
+        .addCookieAuth('op_session')
+        .build(),
     );
     SwaggerModule.setup('docs', app, doc);
   }

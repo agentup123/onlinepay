@@ -2,7 +2,12 @@ import { Body, Controller, Get, HttpCode, Post, Req, Res, UseGuards } from '@nes
 import { Throttle } from '@nestjs/throttler';
 import type { Response } from 'express';
 import { z } from 'zod';
-import { loginStartSchema, otpCodeSchema, otpVerifySchema, signupStartSchema } from '@onlinepay/shared';
+import {
+  loginStartSchema,
+  otpCodeSchema,
+  otpVerifySchema,
+  signupStartSchema,
+} from '@onlinepay/shared';
 import { ZodPipe } from '../common/zod.pipe';
 import { AuthedRequest, CurrentUser, Meta, RequestMeta } from '../common/request';
 import { env } from '../config/env';

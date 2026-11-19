@@ -27,7 +27,8 @@ export class MessagingService {
   async sendSms(to: string, text: string): Promise<void> {
     switch (env.SMS_PROVIDER) {
       case 'console':
-        if (env.NODE_ENV === 'production') throw new Error('Console SMS provider disabled in production');
+        if (env.NODE_ENV === 'production')
+          throw new Error('Console SMS provider disabled in production');
         // Deliberately bypasses redaction so developers can read dev OTPs.
         process.stdout.write(`\n[DEV SMS to ${to}] ${text}\n`);
         // Mirror to Mailpit so SMS codes are readable in the browser and by e2e tests.

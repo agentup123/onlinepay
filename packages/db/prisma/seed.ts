@@ -173,10 +173,16 @@ async function main() {
     });
     console.log('\nAdmin created:', adminEmail);
     console.log('Add this TOTP secret to your authenticator app (shown once):', totpSecret);
-    console.log('otpauth URI:', authenticator.keyuri(adminEmail, 'OnlinePay Admin', totpSecret), '\n');
+    console.log(
+      'otpauth URI:',
+      authenticator.keyuri(adminEmail, 'OnlinePay Admin', totpSecret),
+      '\n',
+    );
   }
 
-  console.log('Seed complete. Demo login: demo@onlinepay.local (OTP is printed by the API in dev).');
+  console.log(
+    'Seed complete. Demo login: demo@onlinepay.local (OTP is printed by the API in dev).',
+  );
 }
 
 main()

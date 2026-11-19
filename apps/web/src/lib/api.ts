@@ -34,7 +34,8 @@ export async function api<T = unknown>(
   const text = await res.text();
   const data = text ? JSON.parse(text) : null;
   if (!res.ok) {
-    const code = (data && (data.code || data.message?.code || data.message)) || `HTTP_${res.status}`;
+    const code =
+      (data && (data.code || data.message?.code || data.message)) || `HTTP_${res.status}`;
     throw new ApiError(res.status, typeof code === 'string' ? code : `HTTP_${res.status}`, data);
   }
   return data as T;

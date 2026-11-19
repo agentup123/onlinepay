@@ -40,7 +40,9 @@ export class IdempotencyInterceptor implements NestInterceptor {
     const scope = req.user?.id ?? (req.admin ? `admin:${req.admin.id}` : 'anon');
     const key = `${scope}:${rawKey}`;
     const route = `${req.method} ${req.route?.path ?? req.path}`;
-    const requestHash = sha256(JSON.stringify({ route, params: req.params, body: req.body ?? null }));
+    const requestHash = sha256(
+      JSON.stringify({ route, params: req.params, body: req.body ?? null }),
+    );
 
     return from(this.claim(key, scope, route, requestHash)).pipe(
       switchMap((existing) => {

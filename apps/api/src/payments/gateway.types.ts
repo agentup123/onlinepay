@@ -18,9 +18,28 @@ export interface CheckoutSession {
 }
 
 export type GatewayEvent =
-  | { eventId: string; type: 'payment.captured'; sessionId?: string; reference?: string; paymentId: string; amountFils: number }
-  | { eventId: string; type: 'payment.failed'; sessionId?: string; reference?: string; paymentId?: string }
-  | { eventId: string; type: 'refund.succeeded' | 'refund.failed'; paymentId: string; refundId: string; amountFils?: number }
+  | {
+      eventId: string;
+      type: 'payment.captured';
+      sessionId?: string;
+      reference?: string;
+      paymentId: string;
+      amountFils: number;
+    }
+  | {
+      eventId: string;
+      type: 'payment.failed';
+      sessionId?: string;
+      reference?: string;
+      paymentId?: string;
+    }
+  | {
+      eventId: string;
+      type: 'refund.succeeded' | 'refund.failed';
+      paymentId: string;
+      refundId: string;
+      amountFils?: number;
+    }
   | { eventId: string; type: 'ignored' };
 
 /**
@@ -32,5 +51,10 @@ export interface PaymentGateway {
   createCheckoutSession(input: CheckoutSessionInput): Promise<CheckoutSession>;
   verifyWebhook(rawBody: Buffer, headers: Record<string, string | string[] | undefined>): boolean;
   parseWebhook(body: Record<string, unknown>): GatewayEvent;
-  refund(input: { paymentId: string; amountFils: number; reason: string; idempotencyKey: string }): Promise<{ refundId: string }>;
+  refund(input: {
+    paymentId: string;
+    amountFils: number;
+    reason: string;
+    idempotencyKey: string;
+  }): Promise<{ refundId: string }>;
 }

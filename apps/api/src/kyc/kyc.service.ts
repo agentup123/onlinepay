@@ -1,4 +1,10 @@
-import { ConflictException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import type { KycSubmitInput } from '@onlinepay/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../common/audit.service';
@@ -27,7 +33,9 @@ export class KycService {
   }
 
   async assertApproved(userId: string) {
-    const approved = await this.prisma.kycApplication.findFirst({ where: { userId, status: 'APPROVED' } });
+    const approved = await this.prisma.kycApplication.findFirst({
+      where: { userId, status: 'APPROVED' },
+    });
     if (!approved) throw new ForbiddenException({ code: 'KYC_REQUIRED' });
   }
 
@@ -77,7 +85,12 @@ export class KycService {
 
     const updated = await this.prisma.kycApplication.update({
       where: { id: applicationId },
-      data: { status: decision, reviewNote: note, reviewedByAdminId: adminId, reviewedAt: new Date() },
+      data: {
+        status: decision,
+        reviewNote: note,
+        reviewedByAdminId: adminId,
+        reviewedAt: new Date(),
+      },
     });
     await this.audit.log({
       actorType: 'ADMIN',
@@ -94,8 +107,14 @@ export class KycService {
       await this.notifications.notify({
         userId: app.userId,
         type: 'KYC',
-        en: { title: 'Identity verification update', body: 'We need more information to verify your identity. Please check your dashboard.' },
-        ar: { title: 'تحديث التحقق من الهوية', body: 'نحتاج إلى مزيد من المعلومات للتحقق من هويتك. يرجى مراجعة لوحة التحكم.' },
+        en: {
+          title: 'Identity verification update',
+          body: 'We need more information to verify your identity. Please check your dashboard.',
+        },
+        ar: {
+          title: 'تحديث التحقق من الهوية',
+          body: 'نحتاج إلى مزيد من المعلومات للتحقق من هويتك. يرجى مراجعة لوحة التحكم.',
+        },
       });
     }
     return updated;
@@ -116,13 +135,22 @@ export class KycService {
         dateOfBirth: app.dateOfBirth.toISOString().slice(0, 10),
         nationality: app.nationality,
       });
-      await this.prisma.user.update({ where: { id: app.user.id }, data: { nymcardHolderId: cardholderId } });
+      await this.prisma.user.update({
+        where: { id: app.user.id },
+        data: { nymcardHolderId: cardholderId },
+      });
     }
     await this.notifications.notify({
       userId: app.userId,
       type: 'KYC',
-      en: { title: 'You are verified', body: 'Your identity is verified. You can now buy a bundle and create cards.' },
-      ar: { title: 'تم التحقق من هويتك', body: 'تم التحقق من هويتك. يمكنك الآن شراء باقة وإنشاء البطاقات.' },
+      en: {
+        title: 'You are verified',
+        body: 'Your identity is verified. You can now buy a bundle and create cards.',
+      },
+      ar: {
+        title: 'تم التحقق من هويتك',
+        body: 'تم التحقق من هويتك. يمكنك الآن شراء باقة وإنشاء البطاقات.',
+      },
     });
   }
 }

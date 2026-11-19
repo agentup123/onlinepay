@@ -36,13 +36,24 @@ export default function CheckoutPage() {
       <div className="panel space-y-4">
         <h1 className="text-2xl font-bold">{t('title')}</h1>
         <div className="text-sm">
-          <div className="flex justify-between py-2"><span>{t('subtotal')}</span><Money fils={vat.subtotalFils} /></div>
-          <div className="flex justify-between py-2"><span>{t('vat')}</span><Money fils={vat.vatFils} /></div>
-          <div className="flex justify-between border-t py-2 text-base font-bold"><span>{t('total')}</span><Money fils={vat.totalFils} /></div>
+          <div className="flex justify-between py-2">
+            <span>{t('subtotal')}</span>
+            <Money fils={vat.subtotalFils} />
+          </div>
+          <div className="flex justify-between py-2">
+            <span>{t('vat')}</span>
+            <Money fils={vat.vatFils} />
+          </div>
+          <div className="flex justify-between border-t py-2 text-base font-bold">
+            <span>{t('total')}</span>
+            <Money fils={vat.totalFils} />
+          </div>
         </div>
         <p className="text-xs text-slate-500">{t('methods')}</p>
         <ErrorText error={error} />
-        <button className="btn-primary w-full" onClick={pay} disabled={busy} data-testid="pay">{t('pay')}</button>
+        <button className="btn-primary w-full" onClick={pay} disabled={busy} data-testid="pay">
+          {t('pay')}
+        </button>
       </div>
     </div>
   );

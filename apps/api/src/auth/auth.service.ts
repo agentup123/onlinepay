@@ -50,11 +50,24 @@ export class AuthService {
   }
 
   async completeSignup(
-    input: { emailChallengeId: string; emailCode: string; phoneChallengeId: string; phoneCode: string },
+    input: {
+      emailChallengeId: string;
+      emailCode: string;
+      phoneChallengeId: string;
+      phoneCode: string;
+    },
     meta: RequestMeta,
   ) {
-    const emailUserId = await this.otp.verify(input.emailChallengeId, input.emailCode, 'SIGNUP_EMAIL');
-    const phoneUserId = await this.otp.verify(input.phoneChallengeId, input.phoneCode, 'SIGNUP_PHONE');
+    const emailUserId = await this.otp.verify(
+      input.emailChallengeId,
+      input.emailCode,
+      'SIGNUP_EMAIL',
+    );
+    const phoneUserId = await this.otp.verify(
+      input.phoneChallengeId,
+      input.phoneCode,
+      'SIGNUP_PHONE',
+    );
     if (emailUserId !== phoneUserId) throw new BadRequestException({ code: 'OTP_INVALID' });
 
     const now = new Date();
@@ -62,7 +75,11 @@ export class AuthService {
       where: { id: emailUserId },
       data: { emailVerifiedAt: now, phoneVerifiedAt: now, status: 'ACTIVE' },
     });
-    await this.prisma.wallet.upsert({ where: { userId: user.id }, update: {}, create: { userId: user.id } });
+    await this.prisma.wallet.upsert({
+      where: { userId: user.id },
+      update: {},
+      create: { userId: user.id },
+    });
     await this.audit.log({ actorType: 'USER', actorId: user.id, action: 'user.signup', meta });
     return this.createSession(user.id, meta);
   }

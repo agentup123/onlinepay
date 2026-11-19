@@ -32,7 +32,11 @@ export class QueueService implements OnModuleDestroy {
   }
 
   async onModuleDestroy() {
-    await Promise.all([this.nymcardEvents.close(), this.paymentEvents.close(), this.maintenance.close()]);
+    await Promise.all([
+      this.nymcardEvents.close(),
+      this.paymentEvents.close(),
+      this.maintenance.close(),
+    ]);
   }
 }
 

@@ -62,7 +62,12 @@ const schema = z.object({
   MONITOR_RISKY_MCCS: z
     .string()
     .default('7995,6051,4829')
-    .transform((v) => v.split(',').map((s) => s.trim()).filter(Boolean)),
+    .transform((v) =>
+      v
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean),
+    ),
 });
 
 export type Env = z.infer<typeof schema>;
@@ -76,7 +81,11 @@ function load(): Env {
   }
   const env = parsed.data;
   if (env.NODE_ENV === 'production') {
-    if (env.NYMCARD_MODE === 'mock' || env.PAYMENT_GATEWAY === 'mock' || env.KYC_PROVIDER === 'mock') {
+    if (
+      env.NYMCARD_MODE === 'mock' ||
+      env.PAYMENT_GATEWAY === 'mock' ||
+      env.KYC_PROVIDER === 'mock'
+    ) {
       throw new Error('Mock providers are not allowed in production');
     }
     if (!env.COOKIE_SECURE) throw new Error('COOKIE_SECURE must be true in production');

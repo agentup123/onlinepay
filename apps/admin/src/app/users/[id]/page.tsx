@@ -28,14 +28,20 @@ export default function UserDetail({ params }: { params: Promise<{ id: string }>
       <div className="flex items-start justify-between">
         <div>
           <PageTitle>{u.fullName}</PageTitle>
-          <p className="text-sm text-slate-600">{u.email} · {u.phone} · {u.status} · joined {dt(u.createdAt)}</p>
+          <p className="text-sm text-slate-600">
+            {u.email} · {u.phone} · {u.status} · joined {dt(u.createdAt)}
+          </p>
           <p className="text-sm text-slate-600">Wallet: {aed(u.wallet?.balanceFils ?? 0)}</p>
         </div>
         <div className="flex gap-2">
           {u.status === 'ACTIVE' ? (
-            <Btn tone="danger" onClick={() => act('suspend user', `/admin/users/${id}/suspend`)}>Suspend</Btn>
+            <Btn tone="danger" onClick={() => act('suspend user', `/admin/users/${id}/suspend`)}>
+              Suspend
+            </Btn>
           ) : (
-            <Btn onClick={() => act('reactivate user', `/admin/users/${id}/reactivate`)}>Reactivate</Btn>
+            <Btn onClick={() => act('reactivate user', `/admin/users/${id}/reactivate`)}>
+              Reactivate
+            </Btn>
           )}
         </div>
       </div>
@@ -43,7 +49,16 @@ export default function UserDetail({ params }: { params: Promise<{ id: string }>
 
       <section>
         <h2 className="mb-2 font-semibold">KYC</h2>
-        <Table head={['Status', 'Document', 'Nationality', 'Provider ref', 'Submitted']} rows={u.kyc.map((k: any) => [k.status, k.documentType, k.nationality, k.providerRef, dt(k.createdAt)])} />
+        <Table
+          head={['Status', 'Document', 'Nationality', 'Provider ref', 'Submitted']}
+          rows={u.kyc.map((k: any) => [
+            k.status,
+            k.documentType,
+            k.nationality,
+            k.providerRef,
+            dt(k.createdAt),
+          ])}
+        />
       </section>
 
       <section>
@@ -56,12 +71,25 @@ export default function UserDetail({ params }: { params: Promise<{ id: string }>
             c.status,
             aed(c.availableBalanceFils),
             dt(c.createdAt),
-            c.status === 'CANCELLED' ? '' : (
+            c.status === 'CANCELLED' ? (
+              ''
+            ) : (
               <div key="a" className="flex gap-1">
-                {c.status === 'ACTIVE'
-                  ? <Btn onClick={() => act('freeze card', `/admin/cards/${c.id}/freeze`)}>Freeze</Btn>
-                  : <Btn onClick={() => act('unfreeze card', `/admin/cards/${c.id}/unfreeze`)}>Unfreeze</Btn>}
-                <Btn tone="danger" onClick={() => act('cancel card', `/admin/cards/${c.id}/cancel`)}>Cancel</Btn>
+                {c.status === 'ACTIVE' ? (
+                  <Btn onClick={() => act('freeze card', `/admin/cards/${c.id}/freeze`)}>
+                    Freeze
+                  </Btn>
+                ) : (
+                  <Btn onClick={() => act('unfreeze card', `/admin/cards/${c.id}/unfreeze`)}>
+                    Unfreeze
+                  </Btn>
+                )}
+                <Btn
+                  tone="danger"
+                  onClick={() => act('cancel card', `/admin/cards/${c.id}/cancel`)}
+                >
+                  Cancel
+                </Btn>
               </div>
             ),
           ])}
@@ -79,23 +107,54 @@ export default function UserDetail({ params }: { params: Promise<{ id: string }>
             p.invoice?.number ?? '—',
             p.paidAt ? dt(p.paidAt) : '—',
             p.status === 'PAID' || p.status === 'PARTIALLY_REFUNDED' ? (
-              <Btn key="r" tone="danger" onClick={() => {
-                const amount = window.prompt('Refund amount in fils (e.g. 3150 = 31.50 AED)', String(p.totalFils));
-                if (amount) void act('refund purchase', `/admin/purchases/${p.id}/refund`, { amountFils: Number(amount) });
-              }}>Refund</Btn>
-            ) : '',
+              <Btn
+                key="r"
+                tone="danger"
+                onClick={() => {
+                  const amount = window.prompt(
+                    'Refund amount in fils (e.g. 3150 = 31.50 AED)',
+                    String(p.totalFils),
+                  );
+                  if (amount)
+                    void act('refund purchase', `/admin/purchases/${p.id}/refund`, {
+                      amountFils: Number(amount),
+                    });
+                }}
+              >
+                Refund
+              </Btn>
+            ) : (
+              ''
+            ),
           ])}
         />
       </section>
 
       <section>
         <h2 className="mb-2 font-semibold">Monitoring flags</h2>
-        <Table head={['Rule', 'Status', 'Details', 'When']} rows={u.flags.map((f: any) => [f.rule, f.status, JSON.stringify(f.details), dt(f.createdAt)])} />
+        <Table
+          head={['Rule', 'Status', 'Details', 'When']}
+          rows={u.flags.map((f: any) => [
+            f.rule,
+            f.status,
+            JSON.stringify(f.details),
+            dt(f.createdAt),
+          ])}
+        />
       </section>
 
       <section>
         <h2 className="mb-2 font-semibold">Wallet ledger</h2>
-        <Table head={['Type', 'Amount', 'Balance after', 'Memo', 'When']} rows={(u.wallet?.entries ?? []).map((e: any) => [e.type, aed(e.amountFils), aed(e.balanceAfter), e.memo ?? '', dt(e.createdAt)])} />
+        <Table
+          head={['Type', 'Amount', 'Balance after', 'Memo', 'When']}
+          rows={(u.wallet?.entries ?? []).map((e: any) => [
+            e.type,
+            aed(e.amountFils),
+            aed(e.balanceAfter),
+            e.memo ?? '',
+            dt(e.createdAt),
+          ])}
+        />
       </section>
     </div>
   );

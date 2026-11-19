@@ -34,9 +34,9 @@ export class PaymentsService {
   ) {}
 
   listBundles() {
-    return this.prisma.bundle.findMany({ where: { active: true }, orderBy: { priceFils: 'asc' } }).then((bundles) =>
-      bundles.map((b) => ({ ...b, ...addVat(b.priceFils, env.VAT_RATE_BPS) })),
-    );
+    return this.prisma.bundle
+      .findMany({ where: { active: true }, orderBy: { priceFils: 'asc' } })
+      .then((bundles) => bundles.map((b) => ({ ...b, ...addVat(b.priceFils, env.VAT_RATE_BPS) })));
   }
 
   async checkoutBundle(user: User, bundleCode: string, idempotencyKey: string, meta: RequestMeta) {
@@ -45,7 +45,9 @@ export class PaymentsService {
       // Recurring billing needs gateway card-on-file / payment instruments — see docs/DECISIONS.md.
       throw new NotImplementedException({ code: 'SUBSCRIPTIONS_NOT_IMPLEMENTED' });
     }
-    const bundle = await this.prisma.bundle.findFirst({ where: { code: bundleCode, active: true } });
+    const bundle = await this.prisma.bundle.findFirst({
+      where: { code: bundleCode, active: true },
+    });
     if (!bundle) throw new NotFoundException({ code: 'BUNDLE_NOT_FOUND' });
 
     const vat = addVat(bundle.priceFils, env.VAT_RATE_BPS);
@@ -85,7 +87,13 @@ export class PaymentsService {
     return this.startCheckout(user, purchase.id, amountFils, 'OnlinePay wallet top-up', meta);
   }
 
-  private async startCheckout(user: User, purchaseId: string, totalFils: number, description: string, meta: RequestMeta) {
+  private async startCheckout(
+    user: User,
+    purchaseId: string,
+    totalFils: number,
+    description: string,
+    meta: RequestMeta,
+  ) {
     const base = `${env.WEB_URL}/${user.locale}/checkout/result?purchase=${purchaseId}`;
     const session = await this.gateway.createCheckoutSession({
       purchaseId,
@@ -98,7 +106,10 @@ export class PaymentsService {
       failureUrl: `${base}&status=failed`,
       idempotencyKey: `checkout-${purchaseId}`,
     });
-    await this.prisma.purchase.update({ where: { id: purchaseId }, data: { gatewaySessionId: session.sessionId } });
+    await this.prisma.purchase.update({
+      where: { id: purchaseId },
+      data: { gatewaySessionId: session.sessionId },
+    });
     await this.audit.log({
       actorType: 'USER',
       actorId: user.id,
@@ -114,7 +125,13 @@ export class PaymentsService {
   async getPurchase(userId: string, purchaseId: string) {
     const p = await this.prisma.purchase.findFirst({
       where: { id: purchaseId, userId },
-      select: { id: true, type: true, status: true, totalFils: true, invoice: { select: { id: true, number: true } } },
+      select: {
+        id: true,
+        type: true,
+        status: true,
+        totalFils: true,
+        invoice: { select: { id: true, number: true } },
+      },
     });
     if (!p) throw new NotFoundException();
     return p;
@@ -128,7 +145,10 @@ export class PaymentsService {
       case 'payment.failed': {
         const purchase = await this.findPurchase(event.sessionId, event.reference);
         if (purchase?.status === 'PENDING') {
-          await this.prisma.purchase.update({ where: { id: purchase.id }, data: { status: 'FAILED' } });
+          await this.prisma.purchase.update({
+            where: { id: purchase.id },
+            data: { status: 'FAILED' },
+          });
         }
         return;
       }
@@ -146,7 +166,8 @@ export class PaymentsService {
   }
 
   private findPurchase(sessionId?: string, reference?: string) {
-    if (sessionId) return this.prisma.purchase.findUnique({ where: { gatewaySessionId: sessionId } });
+    if (sessionId)
+      return this.prisma.purchase.findUnique({ where: { gatewaySessionId: sessionId } });
     if (reference) return this.prisma.purchase.findUnique({ where: { id: reference } });
     return Promise.resolve(null);
   }
@@ -192,7 +213,13 @@ export class PaymentsService {
         );
       }
       await this.audit.log(
-        { actorType: 'SYSTEM', action: 'purchase.paid', targetType: 'Purchase', targetId: purchase.id, metadata: { paymentId: event.paymentId } },
+        {
+          actorType: 'SYSTEM',
+          action: 'purchase.paid',
+          targetType: 'Purchase',
+          targetId: purchase.id,
+          metadata: { paymentId: event.paymentId },
+        },
         tx,
       );
     });
@@ -200,14 +227,32 @@ export class PaymentsService {
     await this.notifications.notify({
       userId: purchase.userId,
       type: 'PURCHASE',
-      en: { title: 'Payment received', body: purchase.type === 'BUNDLE' ? 'Your 30-card bundle is ready to use.' : 'Your wallet has been topped up.' },
-      ar: { title: 'تم استلام الدفعة', body: purchase.type === 'BUNDLE' ? 'باقة الـ ٣٠ بطاقة جاهزة للاستخدام.' : 'تم شحن محفظتك.' },
+      en: {
+        title: 'Payment received',
+        body:
+          purchase.type === 'BUNDLE'
+            ? 'Your 30-card bundle is ready to use.'
+            : 'Your wallet has been topped up.',
+      },
+      ar: {
+        title: 'تم استلام الدفعة',
+        body: purchase.type === 'BUNDLE' ? 'باقة الـ ٣٠ بطاقة جاهزة للاستخدام.' : 'تم شحن محفظتك.',
+      },
     });
   }
 
   /** Admin-initiated refund to the original payment method. */
-  async refund(purchaseId: string, amountFils: number, reason: string, adminId: string, meta: RequestMeta) {
-    const purchase = await this.prisma.purchase.findUnique({ where: { id: purchaseId }, include: { refunds: true } });
+  async refund(
+    purchaseId: string,
+    amountFils: number,
+    reason: string,
+    adminId: string,
+    meta: RequestMeta,
+  ) {
+    const purchase = await this.prisma.purchase.findUnique({
+      where: { id: purchaseId },
+      include: { refunds: true },
+    });
     if (!purchase || !purchase.gatewayPaymentId) throw new NotFoundException();
     if (purchase.status !== 'PAID' && purchase.status !== 'PARTIALLY_REFUNDED') {
       throw new BadRequestException({ code: 'NOT_REFUNDABLE' });
@@ -238,7 +283,14 @@ export class PaymentsService {
     const fullyRefunded = alreadyRefunded + amountFils === purchase.totalFils;
     await this.prisma.$transaction([
       this.prisma.refund.create({
-        data: { purchaseId, amountFils, reason, status: 'PROCESSING', gatewayRefundId: refundId, createdByAdmin: adminId },
+        data: {
+          purchaseId,
+          amountFils,
+          reason,
+          status: 'PROCESSING',
+          gatewayRefundId: refundId,
+          createdByAdmin: adminId,
+        },
       }),
       this.prisma.purchase.update({
         where: { id: purchaseId },

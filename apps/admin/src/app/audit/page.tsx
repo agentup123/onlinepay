@@ -8,12 +8,25 @@ import { ErrorBox, PageTitle, Table } from '@/components/Table';
 export default function Audit() {
   const [target, setTarget] = useState('');
   const [query, setQuery] = useState('');
-  const { data, error } = useAdminApi<any[]>(`/admin/audit${query ? `?targetId=${encodeURIComponent(query)}` : ''}`);
+  const { data, error } = useAdminApi<any[]>(
+    `/admin/audit${query ? `?targetId=${encodeURIComponent(query)}` : ''}`,
+  );
   return (
     <div>
       <PageTitle>Audit log</PageTitle>
-      <form onSubmit={(e) => { e.preventDefault(); setQuery(target); }} className="mb-4 flex gap-2">
-        <input className="w-96 rounded border px-3 py-1.5" value={target} onChange={(e) => setTarget(e.target.value)} placeholder="Filter by target id (card, user, purchase…)" />
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          setQuery(target);
+        }}
+        className="mb-4 flex gap-2"
+      >
+        <input
+          className="w-96 rounded border px-3 py-1.5"
+          value={target}
+          onChange={(e) => setTarget(e.target.value)}
+          placeholder="Filter by target id (card, user, purchase…)"
+        />
         <button className="rounded bg-slate-800 px-3 text-sm text-white">Filter</button>
       </form>
       <ErrorBox error={error} />
@@ -24,7 +37,9 @@ export default function Audit() {
           `${a.actorType}${a.actorId ? `:${a.actorId.slice(0, 8)}` : ''}`,
           a.action,
           a.targetType ? `${a.targetType}:${String(a.targetId).slice(0, 8)}` : '',
-          <code key="c" className="text-xs">{JSON.stringify({ before: a.before, after: a.after, meta: a.metadata })}</code>,
+          <code key="c" className="text-xs">
+            {JSON.stringify({ before: a.before, after: a.after, meta: a.metadata })}
+          </code>,
           a.ip ?? '',
         ])}
       />

@@ -8,7 +8,13 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import type { Card, User } from '@onlinepay/db';
-import { CardAction, canPerform, computeQuota, CreateCardInput, nextStatus } from '@onlinepay/shared';
+import {
+  CardAction,
+  canPerform,
+  computeQuota,
+  CreateCardInput,
+  nextStatus,
+} from '@onlinepay/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../common/audit.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -63,7 +69,10 @@ export class CardsService {
 
   async list(userId: string) {
     const [cards, quota] = await Promise.all([
-      this.prisma.card.findMany({ where: { userId }, orderBy: [{ status: 'asc' }, { createdAt: 'desc' }] }),
+      this.prisma.card.findMany({
+        where: { userId },
+        orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
+      }),
       this.quota(userId),
     ]);
     return { quota, cards: cards.map(publicCard) };
@@ -127,7 +136,13 @@ export class CardsService {
     );
 
     if (input.spendingLimitFils) {
-      await this.setLimit({ type: 'USER', id: user.id }, user.id, card.id, input.spendingLimitFils, meta);
+      await this.setLimit(
+        { type: 'USER', id: user.id },
+        user.id,
+        card.id,
+        input.spendingLimitFils,
+        meta,
+      );
     }
     await this.audit.log({
       actorType: 'USER',
@@ -146,29 +161,57 @@ export class CardsService {
     this.assertAllowed(card, 'RENAME');
     const updated = await this.prisma.card.update({ where: { id: cardId }, data: { label } });
     await this.audit.log({
-      actorType: 'USER', actorId: userId, action: 'card.rename', targetType: 'Card', targetId: cardId,
-      before: { label: card.label }, after: { label }, meta,
+      actorType: 'USER',
+      actorId: userId,
+      action: 'card.rename',
+      targetType: 'Card',
+      targetId: cardId,
+      before: { label: card.label },
+      after: { label },
+      meta,
     });
     return publicCard(updated);
   }
 
-  async setFrozen(actor: Actor, userId: string, cardId: string, frozen: boolean, meta: RequestMeta) {
+  async setFrozen(
+    actor: Actor,
+    userId: string,
+    cardId: string,
+    frozen: boolean,
+    meta: RequestMeta,
+  ) {
     const card = await this.owned(userId, cardId);
     const action: CardAction = frozen ? 'FREEZE' : 'UNFREEZE';
     this.assertAllowed(card, action);
     const status = nextStatus(card.status, action);
-    await this.nymcard.setCardStatus(card.nymcardCardId, status, actor.type === 'ADMIN' ? actor.reason : undefined);
+    await this.nymcard.setCardStatus(
+      card.nymcardCardId,
+      status,
+      actor.type === 'ADMIN' ? actor.reason : undefined,
+    );
     const updated = await this.prisma.card.update({ where: { id: cardId }, data: { status } });
     await this.audit.log({
-      actorType: actor.type, actorId: actor.id, action: `card.${frozen ? 'freeze' : 'unfreeze'}`,
-      targetType: 'Card', targetId: cardId, before: { status: card.status }, after: { status },
-      metadata: actor.type === 'ADMIN' ? { reason: actor.reason } : undefined, meta,
+      actorType: actor.type,
+      actorId: actor.id,
+      action: `card.${frozen ? 'freeze' : 'unfreeze'}`,
+      targetType: 'Card',
+      targetId: cardId,
+      before: { status: card.status },
+      after: { status },
+      metadata: actor.type === 'ADMIN' ? { reason: actor.reason } : undefined,
+      meta,
     });
     await this.notifications.notify({
       userId,
       type: 'CARD_STATUS',
-      en: { title: `Card ${frozen ? 'frozen' : 'unfrozen'}`, body: `Your card "${card.label}" (•••• ${card.last4}) is now ${frozen ? 'frozen' : 'active'}.` },
-      ar: { title: frozen ? 'تم تجميد البطاقة' : 'تم إلغاء تجميد البطاقة', body: `بطاقتك "${card.label}" (•••• ${card.last4}) ${frozen ? 'مجمّدة الآن' : 'نشطة الآن'}.` },
+      en: {
+        title: `Card ${frozen ? 'frozen' : 'unfrozen'}`,
+        body: `Your card "${card.label}" (•••• ${card.last4}) is now ${frozen ? 'frozen' : 'active'}.`,
+      },
+      ar: {
+        title: frozen ? 'تم تجميد البطاقة' : 'تم إلغاء تجميد البطاقة',
+        body: `بطاقتك "${card.label}" (•••• ${card.last4}) ${frozen ? 'مجمّدة الآن' : 'نشطة الآن'}.`,
+      },
     });
     return publicCard(updated);
   }
@@ -192,7 +235,11 @@ export class CardsService {
         // Some issuers block unloads on frozen cards; briefly reactivate to sweep the balance.
         await this.nymcard.setCardStatus(card.nymcardCardId, 'ACTIVE', 'sweep before cancel');
       }
-      const unload = await this.nymcard.unloadFunds(card.nymcardCardId, issuerCard.balanceFils, `cancel-sweep-${card.id}`);
+      const unload = await this.nymcard.unloadFunds(
+        card.nymcardCardId,
+        issuerCard.balanceFils,
+        `cancel-sweep-${card.id}`,
+      );
       returnedFils = issuerCard.balanceFils;
       await this.wallet.credit({
         userId,
@@ -204,56 +251,111 @@ export class CardsService {
       });
     }
 
-    await this.nymcard.setCardStatus(card.nymcardCardId, 'CANCELLED', actor.type === 'ADMIN' ? actor.reason : 'user request');
+    await this.nymcard.setCardStatus(
+      card.nymcardCardId,
+      'CANCELLED',
+      actor.type === 'ADMIN' ? actor.reason : 'user request',
+    );
     const updated = await this.prisma.card.update({
       where: { id: cardId },
       data: { status: 'CANCELLED', cancelledAt: new Date(), availableBalanceFils: 0 },
     });
     await this.audit.log({
-      actorType: actor.type, actorId: actor.id, action: 'card.cancel', targetType: 'Card', targetId: cardId,
-      before: { status: card.status }, after: { status: 'CANCELLED', returnedFils },
-      metadata: actor.type === 'ADMIN' ? { reason: actor.reason } : undefined, meta,
+      actorType: actor.type,
+      actorId: actor.id,
+      action: 'card.cancel',
+      targetType: 'Card',
+      targetId: cardId,
+      before: { status: card.status },
+      after: { status: 'CANCELLED', returnedFils },
+      metadata: actor.type === 'ADMIN' ? { reason: actor.reason } : undefined,
+      meta,
     });
     await this.notifications.notify({
       userId,
       type: 'CARD_CANCELLED',
-      en: { title: 'Card cancelled', body: `Your card "${card.label}" (•••• ${card.last4}) was permanently cancelled.${returnedFils ? ' Its remaining balance was returned to your wallet.' : ''}` },
-      ar: { title: 'تم إلغاء البطاقة', body: `تم إلغاء بطاقتك "${card.label}" (•••• ${card.last4}) نهائياً.${returnedFils ? ' تمت إعادة الرصيد المتبقي إلى محفظتك.' : ''}` },
+      en: {
+        title: 'Card cancelled',
+        body: `Your card "${card.label}" (•••• ${card.last4}) was permanently cancelled.${returnedFils ? ' Its remaining balance was returned to your wallet.' : ''}`,
+      },
+      ar: {
+        title: 'تم إلغاء البطاقة',
+        body: `تم إلغاء بطاقتك "${card.label}" (•••• ${card.last4}) نهائياً.${returnedFils ? ' تمت إعادة الرصيد المتبقي إلى محفظتك.' : ''}`,
+      },
     });
     return { card: publicCard(updated), returnedFils };
   }
 
-  async setLimit(actor: Actor, userId: string, cardId: string, limitFils: number | null, meta: RequestMeta) {
+  async setLimit(
+    actor: Actor,
+    userId: string,
+    cardId: string,
+    limitFils: number | null,
+    meta: RequestMeta,
+  ) {
     const card = await this.owned(userId, cardId);
     this.assertAllowed(card, 'SET_LIMIT');
     await this.nymcard.setSpendingLimit(card.nymcardCardId, limitFils);
-    const updated = await this.prisma.card.update({ where: { id: cardId }, data: { spendingLimitFils: limitFils } });
+    const updated = await this.prisma.card.update({
+      where: { id: cardId },
+      data: { spendingLimitFils: limitFils },
+    });
     await this.audit.log({
-      actorType: actor.type, actorId: actor.id, action: 'card.set_limit', targetType: 'Card', targetId: cardId,
-      before: { spendingLimitFils: card.spendingLimitFils }, after: { spendingLimitFils: limitFils }, meta,
+      actorType: actor.type,
+      actorId: actor.id,
+      action: 'card.set_limit',
+      targetType: 'Card',
+      targetId: cardId,
+      before: { spendingLimitFils: card.spendingLimitFils },
+      after: { spendingLimitFils: limitFils },
+      meta,
     });
     return publicCard(updated);
   }
 
   /** Moves money from the wallet onto a card. Wallet is debited first and reversed on failure. */
-  async fund(userId: string, cardId: string, amountFils: number, idempotencyKey: string, meta: RequestMeta) {
+  async fund(
+    userId: string,
+    cardId: string,
+    amountFils: number,
+    idempotencyKey: string,
+    meta: RequestMeta,
+  ) {
     const card = await this.owned(userId, cardId);
     this.assertAllowed(card, 'FUND');
     const key = `fund:${card.id}:${idempotencyKey}`;
 
-    await this.wallet.debit({ userId, amountFils, type: 'CARD_FUND', idempotencyKey: key, cardId: card.id });
+    await this.wallet.debit({
+      userId,
+      amountFils,
+      type: 'CARD_FUND',
+      idempotencyKey: key,
+      cardId: card.id,
+    });
     try {
       const result = await this.nymcard.loadFunds(card.nymcardCardId, amountFils, key);
-      await this.prisma.card.update({ where: { id: card.id }, data: { availableBalanceFils: result.balanceFils } });
+      await this.prisma.card.update({
+        where: { id: card.id },
+        data: { availableBalanceFils: result.balanceFils },
+      });
       await this.audit.log({
-        actorType: 'USER', actorId: userId, action: 'card.fund', targetType: 'Card', targetId: card.id,
-        metadata: { amountFils, providerRef: result.providerRef }, meta,
+        actorType: 'USER',
+        actorId: userId,
+        action: 'card.fund',
+        targetType: 'Card',
+        targetId: card.id,
+        metadata: { amountFils, providerRef: result.providerRef },
+        meta,
       });
       return { balanceFils: result.balanceFils };
     } catch (err) {
       this.logger.error(`Card load failed for ${card.id}; reversing wallet debit`);
       await this.wallet.credit({
-        userId, amountFils, type: 'CARD_FUND_REVERSAL', idempotencyKey: `${key}:reversal`, cardId: card.id,
+        userId,
+        amountFils,
+        type: 'CARD_FUND_REVERSAL',
+        idempotencyKey: `${key}:reversal`,
+        cardId: card.id,
       });
       throw err;
     }
@@ -267,7 +369,14 @@ export class CardsService {
     const card = await this.owned(userId, cardId);
     this.assertAllowed(card, 'REVEAL');
     const session = await this.nymcard.createSecureDisplaySession(card.nymcardCardId);
-    await this.audit.log({ actorType: 'USER', actorId: userId, action: 'card.reveal', targetType: 'Card', targetId: card.id, meta });
+    await this.audit.log({
+      actorType: 'USER',
+      actorId: userId,
+      action: 'card.reveal',
+      targetType: 'Card',
+      targetId: card.id,
+      meta,
+    });
     return session;
   }
 }

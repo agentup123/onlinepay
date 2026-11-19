@@ -80,15 +80,27 @@ export class NymCardMockClient implements NymCardClient {
     await this.getCard(cardId);
   }
 
-  async loadFunds(cardId: string, amountFils: number, idempotencyKey: string): Promise<FundsResult> {
+  async loadFunds(
+    cardId: string,
+    amountFils: number,
+    idempotencyKey: string,
+  ): Promise<FundsResult> {
     return this.adjust(cardId, amountFils, idempotencyKey);
   }
 
-  async unloadFunds(cardId: string, amountFils: number, idempotencyKey: string): Promise<FundsResult> {
+  async unloadFunds(
+    cardId: string,
+    amountFils: number,
+    idempotencyKey: string,
+  ): Promise<FundsResult> {
     return this.adjust(cardId, -amountFils, idempotencyKey);
   }
 
-  private async adjust(cardId: string, delta: number, idempotencyKey: string): Promise<FundsResult> {
+  private async adjust(
+    cardId: string,
+    delta: number,
+    idempotencyKey: string,
+  ): Promise<FundsResult> {
     const idemKey = `mock:nymcard:funds:${idempotencyKey}`;
     const seen = await this.redis.get(idemKey);
     if (seen) return JSON.parse(seen) as FundsResult;

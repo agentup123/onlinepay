@@ -4,9 +4,13 @@ import { useCallback, useEffect, useState } from 'react';
 import { formatFils } from '@onlinepay/shared';
 
 export const aed = (fils: number) => formatFils(fils);
-export const dt = (iso: string) => new Date(iso).toLocaleString('en-AE', { timeZone: 'Asia/Dubai' });
+export const dt = (iso: string) =>
+  new Date(iso).toLocaleString('en-AE', { timeZone: 'Asia/Dubai' });
 
-export async function api<T = unknown>(path: string, init: { method?: string; body?: unknown } = {}): Promise<T> {
+export async function api<T = unknown>(
+  path: string,
+  init: { method?: string; body?: unknown } = {},
+): Promise<T> {
   const res = await fetch(`/api${path}`, {
     method: init.method ?? (init.body !== undefined ? 'POST' : 'GET'),
     credentials: 'same-origin',
@@ -15,10 +19,18 @@ export async function api<T = unknown>(path: string, init: { method?: string; bo
   });
   const text = await res.text();
   const data = text ? JSON.parse(text) : null;
-  if (res.status === 401 && typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+  if (
+    res.status === 401 &&
+    typeof window !== 'undefined' &&
+    !window.location.pathname.startsWith('/login')
+  ) {
     window.location.assign('/login');
   }
-  if (!res.ok) throw new Error((data && (data.code || data.message?.code || JSON.stringify(data.message))) || `HTTP ${res.status}`);
+  if (!res.ok)
+    throw new Error(
+      (data && (data.code || data.message?.code || JSON.stringify(data.message))) ||
+        `HTTP ${res.status}`,
+    );
   return data as T;
 }
 

@@ -77,21 +77,43 @@ export class CheckoutComGateway implements PaymentGateway {
     const reference = typeof data.reference === 'string' ? data.reference : undefined;
     switch (type) {
       case 'payment_captured':
-        return { eventId, type: 'payment.captured', paymentId, reference, amountFils: Number(data.amount ?? 0) };
+        return {
+          eventId,
+          type: 'payment.captured',
+          paymentId,
+          reference,
+          amountFils: Number(data.amount ?? 0),
+        };
       case 'payment_declined':
       case 'payment_capture_declined':
       case 'payment_expired':
         return { eventId, type: 'payment.failed', paymentId, reference };
       case 'payment_refunded':
-        return { eventId, type: 'refund.succeeded', paymentId, refundId: String(data.action_id ?? eventId), amountFils: Number(data.amount ?? 0) };
+        return {
+          eventId,
+          type: 'refund.succeeded',
+          paymentId,
+          refundId: String(data.action_id ?? eventId),
+          amountFils: Number(data.amount ?? 0),
+        };
       case 'payment_refund_declined':
-        return { eventId, type: 'refund.failed', paymentId, refundId: String(data.action_id ?? eventId) };
+        return {
+          eventId,
+          type: 'refund.failed',
+          paymentId,
+          refundId: String(data.action_id ?? eventId),
+        };
       default:
         return { eventId, type: 'ignored' };
     }
   }
 
-  async refund(input: { paymentId: string; amountFils: number; reason: string; idempotencyKey: string }) {
+  async refund(input: {
+    paymentId: string;
+    amountFils: number;
+    reason: string;
+    idempotencyKey: string;
+  }) {
     const res = await this.post<{ action_id: string }>(
       `/payments/${input.paymentId}/refunds`,
       { amount: input.amountFils, reference: input.reason.slice(0, 50) },

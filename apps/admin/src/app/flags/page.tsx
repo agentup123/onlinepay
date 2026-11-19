@@ -15,20 +15,28 @@ export default function Flags() {
   return (
     <div>
       <PageTitle>Transaction monitoring</PageTitle>
-      <p className="mb-4 text-sm text-slate-600">Escalate anything that may need a Suspicious Transaction Report (goAML) to your MLRO.</p>
+      <p className="mb-4 text-sm text-slate-600">
+        Escalate anything that may need a Suspicious Transaction Report (goAML) to your MLRO.
+      </p>
       <ErrorBox error={error} />
       <Table
         head={['User', 'Rule', 'Details', 'When', '']}
         empty="No open flags."
         rows={(data ?? []).map((f) => [
-          <Link key="u" className="text-blue-700 underline" href={`/users/${f.user.id}`}>{f.user.fullName}</Link>,
+          <Link key="u" className="text-blue-700 underline" href={`/users/${f.user.id}`}>
+            {f.user.fullName}
+          </Link>,
           f.rule,
-          <code key="d" className="text-xs">{JSON.stringify(f.details)}</code>,
+          <code key="d" className="text-xs">
+            {JSON.stringify(f.details)}
+          </code>,
           dt(f.createdAt),
           <div key="a" className="flex gap-1">
             <Btn onClick={() => update(f.id, 'REVIEWING')}>Reviewing</Btn>
             <Btn onClick={() => update(f.id, 'DISMISSED')}>Dismiss</Btn>
-            <Btn tone="danger" onClick={() => update(f.id, 'ESCALATED')}>Escalate</Btn>
+            <Btn tone="danger" onClick={() => update(f.id, 'ESCALATED')}>
+              Escalate
+            </Btn>
           </div>,
         ])}
       />

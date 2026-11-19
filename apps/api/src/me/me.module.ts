@@ -1,4 +1,16 @@
-import { Body, Controller, Get, HttpCode, Module, NotFoundException, Param, ParseUUIDPipe, Patch, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Module,
+  NotFoundException,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { z } from 'zod';
 import type { User } from '@onlinepay/db';
 import { localeSchema } from '@onlinepay/shared';
@@ -9,7 +21,10 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../common/audit.service';
 import { NotificationsService } from '../notifications/notifications.service';
 
-const disputeSchema = z.object({ transactionId: z.string().uuid(), reason: z.string().trim().min(10).max(1000) });
+const disputeSchema = z.object({
+  transactionId: z.string().uuid(),
+  reason: z.string().trim().min(10).max(1000),
+});
 const prefsSchema = z.object({ locale: localeSchema });
 
 /** Signed-in consumer: invoices, notifications, preferences, disputes. */
@@ -23,14 +38,20 @@ export class MeController {
   ) {}
 
   @Patch('preferences')
-  async prefs(@CurrentUser() user: User, @Body(new ZodPipe(prefsSchema)) body: z.infer<typeof prefsSchema>) {
+  async prefs(
+    @CurrentUser() user: User,
+    @Body(new ZodPipe(prefsSchema)) body: z.infer<typeof prefsSchema>,
+  ) {
     await this.prisma.user.update({ where: { id: user.id }, data: { locale: body.locale } });
     return { ok: true };
   }
 
   @Get('invoices')
   invoices(@CurrentUser() user: User) {
-    return this.prisma.invoice.findMany({ where: { userId: user.id }, orderBy: { issuedAt: 'desc' } });
+    return this.prisma.invoice.findMany({
+      where: { userId: user.id },
+      orderBy: { issuedAt: 'desc' },
+    });
   }
 
   @Get('invoices/:id')
@@ -55,11 +76,26 @@ export class MeController {
   }
 
   @Post('disputes')
-  async dispute(@CurrentUser() user: User, @Body(new ZodPipe(disputeSchema)) body: z.infer<typeof disputeSchema>, @Meta() meta: RequestMeta) {
-    const txn = await this.prisma.cardTransaction.findFirst({ where: { id: body.transactionId, card: { userId: user.id } } });
+  async dispute(
+    @CurrentUser() user: User,
+    @Body(new ZodPipe(disputeSchema)) body: z.infer<typeof disputeSchema>,
+    @Meta() meta: RequestMeta,
+  ) {
+    const txn = await this.prisma.cardTransaction.findFirst({
+      where: { id: body.transactionId, card: { userId: user.id } },
+    });
     if (!txn) throw new NotFoundException();
-    const d = await this.prisma.dispute.create({ data: { userId: user.id, transactionId: txn.id, reason: body.reason } });
-    await this.audit.log({ actorType: 'USER', actorId: user.id, action: 'dispute.open', targetType: 'Dispute', targetId: d.id, meta });
+    const d = await this.prisma.dispute.create({
+      data: { userId: user.id, transactionId: txn.id, reason: body.reason },
+    });
+    await this.audit.log({
+      actorType: 'USER',
+      actorId: user.id,
+      action: 'dispute.open',
+      targetType: 'Dispute',
+      targetId: d.id,
+      meta,
+    });
     return d;
   }
 }

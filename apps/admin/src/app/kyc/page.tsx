@@ -11,7 +11,8 @@ export default function KycQueue() {
   const [actionError, setActionError] = useState<string | null>(null);
 
   const decide = async (id: string, decision: 'APPROVED' | 'REJECTED' | 'NEEDS_INFO') => {
-    const note = decision === 'APPROVED' ? undefined : window.prompt('Note for the record') ?? undefined;
+    const note =
+      decision === 'APPROVED' ? undefined : (window.prompt('Note for the record') ?? undefined);
     try {
       await api(`/admin/kyc/${id}/decision`, { body: { decision, note } });
       await reload();
@@ -23,13 +24,17 @@ export default function KycQueue() {
   return (
     <div>
       <PageTitle>KYC queue</PageTitle>
-      <p className="mb-4 text-sm text-slate-600">Review documents in the KYC provider's console, then record the decision here.</p>
+      <p className="mb-4 text-sm text-slate-600">
+        Review documents in the KYC provider's console, then record the decision here.
+      </p>
       <ErrorBox error={error ?? actionError} />
       <Table
         head={['User', 'Document', 'Nationality', 'Provider ref', 'Submitted', '']}
         empty="No applications waiting."
         rows={(data ?? []).map((k) => [
-          <Link key="u" className="text-blue-700 underline" href={`/users/${k.user.id}`}>{k.user.fullName}</Link>,
+          <Link key="u" className="text-blue-700 underline" href={`/users/${k.user.id}`}>
+            {k.user.fullName}
+          </Link>,
           k.documentType,
           k.nationality,
           k.providerRef,
@@ -37,7 +42,9 @@ export default function KycQueue() {
           <div key="a" className="flex gap-1">
             <Btn onClick={() => decide(k.id, 'APPROVED')}>Approve</Btn>
             <Btn onClick={() => decide(k.id, 'NEEDS_INFO')}>Needs info</Btn>
-            <Btn tone="danger" onClick={() => decide(k.id, 'REJECTED')}>Reject</Btn>
+            <Btn tone="danger" onClick={() => decide(k.id, 'REJECTED')}>
+              Reject
+            </Btn>
           </div>,
         ])}
       />

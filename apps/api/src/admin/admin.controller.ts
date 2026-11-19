@@ -26,7 +26,13 @@ import { CardsService } from '../cards/cards.service';
 import { KycService } from '../kyc/kyc.service';
 import { PaymentsService } from '../payments/payments.service';
 import { WebhooksService } from '../webhooks/webhooks.service';
-import { ADMIN_COOKIE, ADMIN_SESSION_TTL_MS, AdminAuthService, AdminGuard, Roles } from './admin-auth';
+import {
+  ADMIN_COOKIE,
+  ADMIN_SESSION_TTL_MS,
+  AdminAuthService,
+  AdminGuard,
+  Roles,
+} from './admin-auth';
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -38,7 +44,10 @@ const kycDecisionSchema = z.object({
   decision: z.enum(['APPROVED', 'REJECTED', 'NEEDS_INFO']),
   note: z.string().max(1000).optional(),
 });
-const refundSchema = z.object({ amountFils: z.number().int().positive(), reason: z.string().trim().min(5).max(500) });
+const refundSchema = z.object({
+  amountFils: z.number().int().positive(),
+  reason: z.string().trim().min(5).max(500),
+});
 const bundleUpdateSchema = z.object({
   priceFils: z.number().int().positive().optional(),
   cardQuota: z.number().int().positive().max(1000).optional(),
@@ -111,7 +120,11 @@ export class AdminController {
       this.prisma.kycApplication.count({ where: { status: 'PENDING' } }),
       this.prisma.card.count({ where: { status: 'ACTIVE' } }),
       this.prisma.suspiciousActivityFlag.count({ where: { status: 'OPEN' } }),
-      this.prisma.purchase.aggregate({ where: { status: 'PAID' }, _sum: { totalFils: true }, _count: true }),
+      this.prisma.purchase.aggregate({
+        where: { status: 'PAID' },
+        _sum: { totalFils: true },
+        _count: true,
+      }),
       this.prisma.webhookEvent.count({ where: { processedAt: null, attempts: { gte: 3 } } }),
     ]);
     return {
@@ -129,7 +142,14 @@ export class AdminController {
   @Get('users')
   users(@Query('q') q?: string) {
     const where: Prisma.UserWhereInput = q
-      ? { OR: [{ email: { contains: q, mode: 'insensitive' } }, { phone: { contains: q } }, { fullName: { contains: q, mode: 'insensitive' } }, { id: q }] }
+      ? {
+          OR: [
+            { email: { contains: q, mode: 'insensitive' } },
+            { phone: { contains: q } },
+            { fullName: { contains: q, mode: 'insensitive' } },
+            { id: q },
+          ],
+        }
       : {};
     return this.prisma.user.findMany({
       where,
@@ -140,7 +160,11 @@ export class AdminController {
   }
 
   @Get('users/:id')
-  async user(@Param('id', ParseUUIDPipe) id: string, @CurrentAdmin() admin: AdminUser, @Meta() meta: RequestMeta) {
+  async user(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentAdmin() admin: AdminUser,
+    @Meta() meta: RequestMeta,
+  ) {
     const user = await this.prisma.user.findUnique({
       where: { id },
       include: {
@@ -154,28 +178,64 @@ export class AdminController {
     });
     if (!user) throw new NotFoundException();
     // Viewing customer PII is itself audited.
-    await this.audit.log({ actorType: 'ADMIN', actorId: admin.id, action: 'admin.user.view', targetType: 'User', targetId: id, meta });
+    await this.audit.log({
+      actorType: 'ADMIN',
+      actorId: admin.id,
+      action: 'admin.user.view',
+      targetType: 'User',
+      targetId: id,
+      meta,
+    });
     return user;
   }
 
   @Post('users/:id/suspend')
   @HttpCode(200)
   @Roles('SUPPORT', 'COMPLIANCE')
-  async suspend(@Param('id', ParseUUIDPipe) id: string, @Body(new ZodPipe(reasonSchema)) body: z.infer<typeof reasonSchema>, @CurrentAdmin() admin: AdminUser, @Meta() meta: RequestMeta) {
+  async suspend(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodPipe(reasonSchema)) body: z.infer<typeof reasonSchema>,
+    @CurrentAdmin() admin: AdminUser,
+    @Meta() meta: RequestMeta,
+  ) {
     await this.prisma.$transaction([
       this.prisma.user.update({ where: { id }, data: { status: 'SUSPENDED' } }),
-      this.prisma.session.updateMany({ where: { userId: id, revokedAt: null }, data: { revokedAt: new Date() } }),
+      this.prisma.session.updateMany({
+        where: { userId: id, revokedAt: null },
+        data: { revokedAt: new Date() },
+      }),
     ]);
-    await this.audit.log({ actorType: 'ADMIN', actorId: admin.id, action: 'admin.user.suspend', targetType: 'User', targetId: id, metadata: body, meta });
+    await this.audit.log({
+      actorType: 'ADMIN',
+      actorId: admin.id,
+      action: 'admin.user.suspend',
+      targetType: 'User',
+      targetId: id,
+      metadata: body,
+      meta,
+    });
     return { ok: true };
   }
 
   @Post('users/:id/reactivate')
   @HttpCode(200)
   @Roles('COMPLIANCE')
-  async reactivate(@Param('id', ParseUUIDPipe) id: string, @Body(new ZodPipe(reasonSchema)) body: z.infer<typeof reasonSchema>, @CurrentAdmin() admin: AdminUser, @Meta() meta: RequestMeta) {
+  async reactivate(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodPipe(reasonSchema)) body: z.infer<typeof reasonSchema>,
+    @CurrentAdmin() admin: AdminUser,
+    @Meta() meta: RequestMeta,
+  ) {
     await this.prisma.user.update({ where: { id }, data: { status: 'ACTIVE' } });
-    await this.audit.log({ actorType: 'ADMIN', actorId: admin.id, action: 'admin.user.reactivate', targetType: 'User', targetId: id, metadata: body, meta });
+    await this.audit.log({
+      actorType: 'ADMIN',
+      actorId: admin.id,
+      action: 'admin.user.reactivate',
+      targetType: 'User',
+      targetId: id,
+      metadata: body,
+      meta,
+    });
     return { ok: true };
   }
 
@@ -193,7 +253,12 @@ export class AdminController {
   @Post('kyc/:id/decision')
   @HttpCode(200)
   @Roles('COMPLIANCE')
-  kycDecision(@Param('id', ParseUUIDPipe) id: string, @Body(new ZodPipe(kycDecisionSchema)) body: z.infer<typeof kycDecisionSchema>, @CurrentAdmin() admin: AdminUser, @Meta() meta: RequestMeta) {
+  kycDecision(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodPipe(kycDecisionSchema)) body: z.infer<typeof kycDecisionSchema>,
+    @CurrentAdmin() admin: AdminUser,
+    @Meta() meta: RequestMeta,
+  ) {
     return this.kyc.decide(id, body.decision, body.note, admin.id, meta);
   }
 
@@ -205,10 +270,24 @@ export class AdminController {
 
   @Patch('bundles/:id')
   @Roles('SUPER_ADMIN')
-  async updateBundle(@Param('id', ParseUUIDPipe) id: string, @Body(new ZodPipe(bundleUpdateSchema)) body: z.infer<typeof bundleUpdateSchema>, @CurrentAdmin() admin: AdminUser, @Meta() meta: RequestMeta) {
+  async updateBundle(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodPipe(bundleUpdateSchema)) body: z.infer<typeof bundleUpdateSchema>,
+    @CurrentAdmin() admin: AdminUser,
+    @Meta() meta: RequestMeta,
+  ) {
     const before = await this.prisma.bundle.findUniqueOrThrow({ where: { id } });
     const after = await this.prisma.bundle.update({ where: { id }, data: body });
-    await this.audit.log({ actorType: 'ADMIN', actorId: admin.id, action: 'admin.bundle.update', targetType: 'Bundle', targetId: id, before, after, meta });
+    await this.audit.log({
+      actorType: 'ADMIN',
+      actorId: admin.id,
+      action: 'admin.bundle.update',
+      targetType: 'Bundle',
+      targetId: id,
+      before,
+      after,
+      meta,
+    });
     return after;
   }
 
@@ -225,31 +304,67 @@ export class AdminController {
 
   @Get('cards/:id/transactions')
   cardTransactions(@Param('id', ParseUUIDPipe) id: string) {
-    return this.prisma.cardTransaction.findMany({ where: { cardId: id }, orderBy: { occurredAt: 'desc' }, take: 200 });
+    return this.prisma.cardTransaction.findMany({
+      where: { cardId: id },
+      orderBy: { occurredAt: 'desc' },
+      take: 200,
+    });
   }
 
   @Post('cards/:id/freeze')
   @HttpCode(200)
   @Roles('SUPPORT', 'COMPLIANCE')
-  async freezeCard(@Param('id', ParseUUIDPipe) id: string, @Body(new ZodPipe(reasonSchema)) body: z.infer<typeof reasonSchema>, @CurrentAdmin() admin: AdminUser, @Meta() meta: RequestMeta) {
+  async freezeCard(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodPipe(reasonSchema)) body: z.infer<typeof reasonSchema>,
+    @CurrentAdmin() admin: AdminUser,
+    @Meta() meta: RequestMeta,
+  ) {
     const card = await this.prisma.card.findUniqueOrThrow({ where: { id } });
-    return this.cards.setFrozen({ type: 'ADMIN', id: admin.id, reason: body.reason }, card.userId, id, true, meta);
+    return this.cards.setFrozen(
+      { type: 'ADMIN', id: admin.id, reason: body.reason },
+      card.userId,
+      id,
+      true,
+      meta,
+    );
   }
 
   @Post('cards/:id/unfreeze')
   @HttpCode(200)
   @Roles('COMPLIANCE')
-  async unfreezeCard(@Param('id', ParseUUIDPipe) id: string, @Body(new ZodPipe(reasonSchema)) body: z.infer<typeof reasonSchema>, @CurrentAdmin() admin: AdminUser, @Meta() meta: RequestMeta) {
+  async unfreezeCard(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodPipe(reasonSchema)) body: z.infer<typeof reasonSchema>,
+    @CurrentAdmin() admin: AdminUser,
+    @Meta() meta: RequestMeta,
+  ) {
     const card = await this.prisma.card.findUniqueOrThrow({ where: { id } });
-    return this.cards.setFrozen({ type: 'ADMIN', id: admin.id, reason: body.reason }, card.userId, id, false, meta);
+    return this.cards.setFrozen(
+      { type: 'ADMIN', id: admin.id, reason: body.reason },
+      card.userId,
+      id,
+      false,
+      meta,
+    );
   }
 
   @Post('cards/:id/cancel')
   @HttpCode(200)
   @Roles('SUPPORT', 'COMPLIANCE')
-  async cancelCard(@Param('id', ParseUUIDPipe) id: string, @Body(new ZodPipe(reasonSchema)) body: z.infer<typeof reasonSchema>, @CurrentAdmin() admin: AdminUser, @Meta() meta: RequestMeta) {
+  async cancelCard(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodPipe(reasonSchema)) body: z.infer<typeof reasonSchema>,
+    @CurrentAdmin() admin: AdminUser,
+    @Meta() meta: RequestMeta,
+  ) {
     const card = await this.prisma.card.findUniqueOrThrow({ where: { id } });
-    return this.cards.cancel({ type: 'ADMIN', id: admin.id, reason: body.reason }, card.userId, id, meta);
+    return this.cards.cancel(
+      { type: 'ADMIN', id: admin.id, reason: body.reason },
+      card.userId,
+      id,
+      meta,
+    );
   }
 
   // ── Purchases & refunds ──
@@ -259,14 +374,23 @@ export class AdminController {
       where: status ? { status: status as 'PAID' } : {},
       orderBy: { createdAt: 'desc' },
       take: 100,
-      include: { user: { select: { id: true, email: true } }, refunds: true, invoice: { select: { number: true } } },
+      include: {
+        user: { select: { id: true, email: true } },
+        refunds: true,
+        invoice: { select: { number: true } },
+      },
     });
   }
 
   @Post('purchases/:id/refund')
   @HttpCode(200)
   @Roles('SUPER_ADMIN')
-  refund(@Param('id', ParseUUIDPipe) id: string, @Body(new ZodPipe(refundSchema)) body: z.infer<typeof refundSchema>, @CurrentAdmin() admin: AdminUser, @Meta() meta: RequestMeta) {
+  refund(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodPipe(refundSchema)) body: z.infer<typeof refundSchema>,
+    @CurrentAdmin() admin: AdminUser,
+    @Meta() meta: RequestMeta,
+  ) {
     return this.payments.refund(id, body.amountFils, body.reason, admin.id, meta);
   }
 
@@ -283,23 +407,56 @@ export class AdminController {
 
   @Patch('flags/:id')
   @Roles('COMPLIANCE')
-  async updateFlag(@Param('id', ParseUUIDPipe) id: string, @Body(new ZodPipe(flagUpdateSchema)) body: z.infer<typeof flagUpdateSchema>, @CurrentAdmin() admin: AdminUser, @Meta() meta: RequestMeta) {
-    const flag = await this.prisma.suspiciousActivityFlag.update({ where: { id }, data: { ...body, resolvedBy: admin.id } });
-    await this.audit.log({ actorType: 'ADMIN', actorId: admin.id, action: 'admin.flag.update', targetType: 'SuspiciousActivityFlag', targetId: id, after: body, meta });
+  async updateFlag(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodPipe(flagUpdateSchema)) body: z.infer<typeof flagUpdateSchema>,
+    @CurrentAdmin() admin: AdminUser,
+    @Meta() meta: RequestMeta,
+  ) {
+    const flag = await this.prisma.suspiciousActivityFlag.update({
+      where: { id },
+      data: { ...body, resolvedBy: admin.id },
+    });
+    await this.audit.log({
+      actorType: 'ADMIN',
+      actorId: admin.id,
+      action: 'admin.flag.update',
+      targetType: 'SuspiciousActivityFlag',
+      targetId: id,
+      after: body,
+      meta,
+    });
     return flag;
   }
 
   // ── Disputes ──
   @Get('disputes')
   disputes() {
-    return this.prisma.dispute.findMany({ orderBy: { createdAt: 'desc' }, take: 100, include: { user: { select: { id: true, email: true } } } });
+    return this.prisma.dispute.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+      include: { user: { select: { id: true, email: true } } },
+    });
   }
 
   @Patch('disputes/:id')
   @Roles('SUPPORT', 'COMPLIANCE')
-  async updateDispute(@Param('id', ParseUUIDPipe) id: string, @Body(new ZodPipe(disputeUpdateSchema)) body: z.infer<typeof disputeUpdateSchema>, @CurrentAdmin() admin: AdminUser, @Meta() meta: RequestMeta) {
+  async updateDispute(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodPipe(disputeUpdateSchema)) body: z.infer<typeof disputeUpdateSchema>,
+    @CurrentAdmin() admin: AdminUser,
+    @Meta() meta: RequestMeta,
+  ) {
     const d = await this.prisma.dispute.update({ where: { id }, data: body });
-    await this.audit.log({ actorType: 'ADMIN', actorId: admin.id, action: 'admin.dispute.update', targetType: 'Dispute', targetId: id, after: body, meta });
+    await this.audit.log({
+      actorType: 'ADMIN',
+      actorId: admin.id,
+      action: 'admin.dispute.update',
+      targetType: 'Dispute',
+      targetId: id,
+      after: body,
+      meta,
+    });
     return d;
   }
 
@@ -319,15 +476,33 @@ export class AdminController {
       where: { processedAt: null, attempts: { gte: 1 } },
       orderBy: { receivedAt: 'desc' },
       take: 100,
-      select: { id: true, provider: true, eventType: true, attempts: true, lastError: true, receivedAt: true },
+      select: {
+        id: true,
+        provider: true,
+        eventType: true,
+        attempts: true,
+        lastError: true,
+        receivedAt: true,
+      },
     });
   }
 
   @Post('webhooks/:id/retry')
   @HttpCode(200)
   @Roles('SUPER_ADMIN')
-  async retryWebhook(@Param('id', ParseUUIDPipe) id: string, @CurrentAdmin() admin: AdminUser, @Meta() meta: RequestMeta) {
-    await this.audit.log({ actorType: 'ADMIN', actorId: admin.id, action: 'admin.webhook.retry', targetType: 'WebhookEvent', targetId: id, meta });
+  async retryWebhook(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentAdmin() admin: AdminUser,
+    @Meta() meta: RequestMeta,
+  ) {
+    await this.audit.log({
+      actorType: 'ADMIN',
+      actorId: admin.id,
+      action: 'admin.webhook.retry',
+      targetType: 'WebhookEvent',
+      targetId: id,
+      meta,
+    });
     return this.webhooks.retry(id);
   }
 }

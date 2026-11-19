@@ -58,7 +58,13 @@ export class WebhooksController {
       throw new UnauthorizedException({ code: 'BAD_SIGNATURE' });
     }
     const body = req.body as Record<string, unknown>;
-    return this.webhooks.ingest('checkoutcom', String(body.id ?? ''), String(body.type ?? 'unknown'), raw, body);
+    return this.webhooks.ingest(
+      'checkoutcom',
+      String(body.id ?? ''),
+      String(body.type ?? 'unknown'),
+      raw,
+      body,
+    );
   }
 
   /** Dev-only: the mock hosted payment page reports its outcome here. */
@@ -68,9 +74,16 @@ export class WebhooksController {
     @Req() req: RawBodyRequest<Request>,
     @Body(new ZodPipe(mockCompleteSchema)) body: z.infer<typeof mockCompleteSchema>,
   ) {
-    if (this.gateway.name !== 'mock' || env.NODE_ENV === 'production') throw new ForbiddenException();
+    if (this.gateway.name !== 'mock' || env.NODE_ENV === 'production')
+      throw new ForbiddenException();
     const raw = req.rawBody ?? Buffer.from(JSON.stringify(body));
-    return this.webhooks.ingest('mock-gateway', `${body.sessionId}:${body.outcome}`, `mock.${body.outcome}`, raw, body);
+    return this.webhooks.ingest(
+      'mock-gateway',
+      `${body.sessionId}:${body.outcome}`,
+      `mock.${body.outcome}`,
+      raw,
+      body,
+    );
   }
 }
 

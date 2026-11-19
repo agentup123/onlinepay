@@ -5,7 +5,9 @@ const MAILPIT = process.env.MAILPIT_URL ?? 'http://localhost:8025';
 /** Reads the most recent 6-digit OTP sent to an address via Mailpit's API. */
 async function latestEmailOtp(request: APIRequestContext, to: string): Promise<string> {
   for (let i = 0; i < 20; i++) {
-    const res = await request.get(`${MAILPIT}/api/v1/search?query=${encodeURIComponent(`to:${to}`)}`);
+    const res = await request.get(
+      `${MAILPIT}/api/v1/search?query=${encodeURIComponent(`to:${to}`)}`,
+    );
     const body = await res.json();
     const msg = body.messages?.[0];
     if (msg) {
@@ -50,7 +52,9 @@ test('consumer core flow', async ({ page, request }) => {
   await page.getByTestId('buy-bundle').click();
   await page.getByTestId('pay').click();
   await page.getByTestId('mock-pay-success').click();
-  await expect(page.getByTestId('checkout-result')).toContainText('Payment successful', { timeout: 30_000 });
+  await expect(page.getByTestId('checkout-result')).toContainText('Payment successful', {
+    timeout: 30_000,
+  });
 
   await page.goto('/en/dashboard');
   await expect(page.getByTestId('quota')).toContainText('30 of 30');

@@ -17,7 +17,13 @@ export default function NotificationsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">{t('title')}</h1>
-        <button className="btn-secondary" onClick={async () => { await api('/me/notifications/read', { body: {} }); await reload(); }}>
+        <button
+          className="btn-secondary"
+          onClick={async () => {
+            await api('/me/notifications/read', { body: {} });
+            await reload();
+          }}
+        >
           {t('markRead')}
         </button>
       </div>
@@ -30,7 +36,9 @@ export default function NotificationsPage() {
               <li key={n.id} className={`py-3 ${n.readAt ? 'opacity-60' : ''}`}>
                 <p className="font-medium">{ar ? n.titleAr : n.titleEn}</p>
                 <p className="text-sm text-slate-600">{ar ? n.bodyAr : n.bodyEn}</p>
-                <p className="text-xs text-slate-400">{new Date(n.createdAt).toLocaleString(ar ? 'ar-AE' : 'en-AE')}</p>
+                <p className="text-xs text-slate-400">
+                  {new Date(n.createdAt).toLocaleString(ar ? 'ar-AE' : 'en-AE')}
+                </p>
               </li>
             ))}
           </ul>

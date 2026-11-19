@@ -25,7 +25,13 @@ function Result() {
   const params = useSearchParams();
   const purchaseId = params.get('purchase');
   const redirectStatus = params.get('status');
-  const [outcome, setOutcome] = useState<Outcome>(redirectStatus === 'success' ? 'processing' : redirectStatus === 'cancelled' ? 'cancelled' : 'failed');
+  const [outcome, setOutcome] = useState<Outcome>(
+    redirectStatus === 'success'
+      ? 'processing'
+      : redirectStatus === 'cancelled'
+        ? 'cancelled'
+        : 'failed',
+  );
 
   useEffect(() => {
     if (outcome !== 'processing' || !purchaseId) return;
@@ -47,8 +53,12 @@ function Result() {
   return (
     <div className="mx-auto max-w-md">
       <div className="panel space-y-4 text-center">
-        <p className="text-lg font-semibold" data-testid="checkout-result">{t(`result.${outcome}`)}</p>
-        <Link href="/dashboard" className="btn-primary">{t('gotoDashboard')}</Link>
+        <p className="text-lg font-semibold" data-testid="checkout-result">
+          {t(`result.${outcome}`)}
+        </p>
+        <Link href="/dashboard" className="btn-primary">
+          {t('gotoDashboard')}
+        </Link>
       </div>
     </div>
   );

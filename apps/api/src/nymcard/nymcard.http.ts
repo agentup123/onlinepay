@@ -30,7 +30,9 @@ export class NymCardHttpClient implements NymCardClient {
 
   constructor(private readonly cfg: NymCardHttpConfig) {
     if (!cfg.baseUrl || !cfg.apiKey) {
-      throw new Error('NYMCARD_BASE_URL and NYMCARD_API_KEY are required when NYMCARD_MODE != mock');
+      throw new Error(
+        'NYMCARD_BASE_URL and NYMCARD_API_KEY are required when NYMCARD_MODE != mock',
+      );
     }
   }
 
@@ -76,20 +78,30 @@ export class NymCardHttpClient implements NymCardClient {
       last4: String(raw.last_four ?? raw.last4 ?? ''),
       expiryMonth: Number(raw.expiry_month),
       expiryYear: Number(raw.expiry_year),
-      status: status === 'FROZEN' || status === 'BLOCKED' ? 'FROZEN' : status === 'ACTIVE' ? 'ACTIVE' : 'CANCELLED',
+      status:
+        status === 'FROZEN' || status === 'BLOCKED'
+          ? 'FROZEN'
+          : status === 'ACTIVE'
+            ? 'ACTIVE'
+            : 'CANCELLED',
       balanceFils: Number(raw.available_balance ?? 0),
     };
   }
 
   async createCardholder(input: CreateCardholderInput) {
-    const res = await this.request<{ id: string }>('POST', '/v1/cardholders', {
-      external_ref: input.externalRef,
-      name: input.fullName,
-      email: input.email,
-      mobile: input.phone,
-      date_of_birth: input.dateOfBirth,
-      nationality: input.nationality,
-    }, `holder-${input.externalRef}`);
+    const res = await this.request<{ id: string }>(
+      'POST',
+      '/v1/cardholders',
+      {
+        external_ref: input.externalRef,
+        name: input.fullName,
+        email: input.email,
+        mobile: input.phone,
+        date_of_birth: input.dateOfBirth,
+        nationality: input.nationality,
+      },
+      `holder-${input.externalRef}`,
+    );
     return { cardholderId: res.id };
   }
 
@@ -97,7 +109,12 @@ export class NymCardHttpClient implements NymCardClient {
     const res = await this.request<Record<string, unknown>>(
       'POST',
       '/v1/cards',
-      { cardholder_id: input.cardholderId, product_id: this.cfg.productId, type: 'VIRTUAL', nickname: input.label },
+      {
+        cardholder_id: input.cardholderId,
+        product_id: this.cfg.productId,
+        type: 'VIRTUAL',
+        nickname: input.label,
+      },
       input.idempotencyKey,
     );
     return this.mapCard(res);
@@ -115,7 +132,11 @@ export class NymCardHttpClient implements NymCardClient {
     await this.request('PUT', `/v1/cards/${cardId}/limits`, { amount: limitFils, currency: 'AED' });
   }
 
-  async loadFunds(cardId: string, amountFils: number, idempotencyKey: string): Promise<FundsResult> {
+  async loadFunds(
+    cardId: string,
+    amountFils: number,
+    idempotencyKey: string,
+  ): Promise<FundsResult> {
     const res = await this.request<{ id: string; available_balance: number }>(
       'POST',
       `/v1/cards/${cardId}/load`,
@@ -125,7 +146,11 @@ export class NymCardHttpClient implements NymCardClient {
     return { providerRef: res.id, balanceFils: res.available_balance };
   }
 
-  async unloadFunds(cardId: string, amountFils: number, idempotencyKey: string): Promise<FundsResult> {
+  async unloadFunds(
+    cardId: string,
+    amountFils: number,
+    idempotencyKey: string,
+  ): Promise<FundsResult> {
     const res = await this.request<{ id: string; available_balance: number }>(
       'POST',
       `/v1/cards/${cardId}/unload`,
@@ -145,7 +170,10 @@ export class NymCardHttpClient implements NymCardClient {
 
   async listTransactions(cardId: string, since?: Date): Promise<IssuerTransaction[]> {
     const qs = since ? `?from=${encodeURIComponent(since.toISOString())}` : '';
-    const res = await this.request<{ data: Record<string, unknown>[] }>('GET', `/v1/cards/${cardId}/transactions${qs}`);
+    const res = await this.request<{ data: Record<string, unknown>[] }>(
+      'GET',
+      `/v1/cards/${cardId}/transactions${qs}`,
+    );
     return res.data.map((t) => ({
       id: String(t.id),
       cardId,

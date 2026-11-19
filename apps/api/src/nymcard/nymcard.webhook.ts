@@ -6,7 +6,11 @@ import type { NymCardEvent } from './nymcard.types';
  * TODO(nymcard-docs): confirm the signature header, algorithm and whether a timestamp is
  * included in the signed payload. Assumed: hex HMAC-SHA256 of the raw request body.
  */
-export function verifyNymCardSignature(rawBody: Buffer, signature: string | undefined, secret: string) {
+export function verifyNymCardSignature(
+  rawBody: Buffer,
+  signature: string | undefined,
+  secret: string,
+) {
   if (!signature) return false;
   const provided = signature.replace(/^sha256=/, '').trim();
   if (!/^[0-9a-f]+$/i.test(provided)) return false;
@@ -16,7 +20,8 @@ export function verifyNymCardSignature(rawBody: Buffer, signature: string | unde
 type Raw = Record<string, unknown>;
 type TxnStage = Extract<NymCardEvent, { kind: 'transaction' }>['stage'];
 const str = (v: unknown) => (typeof v === 'string' ? v : undefined);
-const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? Math.round(v) : undefined);
+const num = (v: unknown) =>
+  typeof v === 'number' && Number.isFinite(v) ? Math.round(v) : undefined;
 
 /**
  * Maps a raw NymCard webhook payload into our normalised event.

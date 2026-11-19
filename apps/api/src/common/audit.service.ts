@@ -16,8 +16,7 @@ export interface AuditEntry {
   meta?: RequestMeta;
 }
 
-const json = (v: unknown) =>
-  v === undefined ? undefined : (redact(v) as Prisma.InputJsonValue);
+const json = (v: unknown) => (v === undefined ? undefined : (redact(v) as Prisma.InputJsonValue));
 
 /** Append-only audit trail for every card, money, KYC and admin action. */
 @Injectable()

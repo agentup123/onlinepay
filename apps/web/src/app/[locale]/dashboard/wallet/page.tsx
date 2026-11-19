@@ -40,13 +40,26 @@ export default function WalletPage() {
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="panel">
           <p className="text-sm text-slate-500">{t('balance')}</p>
-          <p className="mt-2 text-3xl font-bold"><Money fils={wallet.data?.balanceFils ?? 0} /></p>
+          <p className="mt-2 text-3xl font-bold">
+            <Money fils={wallet.data?.balanceFils ?? 0} />
+          </p>
         </div>
         <form onSubmit={topUp} className="panel space-y-3">
-          <label className="label" htmlFor="amount">{t('amount')}</label>
-          <input className="input ltr-nums" id="amount" name="amount" inputMode="decimal" pattern="\d+(\.\d{1,2})?" required />
+          <label className="label" htmlFor="amount">
+            {t('amount')}
+          </label>
+          <input
+            className="input ltr-nums"
+            id="amount"
+            name="amount"
+            inputMode="decimal"
+            pattern="\d+(\.\d{1,2})?"
+            required
+          />
           <ErrorText error={error} />
-          <button className="btn-primary w-full" disabled={busy}>{t('topUp')}</button>
+          <button className="btn-primary w-full" disabled={busy}>
+            {t('topUp')}
+          </button>
         </form>
       </div>
       <div className="panel">
@@ -58,10 +71,17 @@ export default function WalletPage() {
             {wallet.data!.entries.map((e) => (
               <li key={e.id} className="flex justify-between py-3 text-sm">
                 <div>
-                  <p className="font-medium">{t.has(`types.${e.type}`) ? t(`types.${e.type}`) : e.type}</p>
-                  <p className="text-xs text-slate-500">{new Date(e.createdAt).toLocaleString(locale === 'ar' ? 'ar-AE' : 'en-AE')}</p>
+                  <p className="font-medium">
+                    {t.has(`types.${e.type}`) ? t(`types.${e.type}`) : e.type}
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    {new Date(e.createdAt).toLocaleString(locale === 'ar' ? 'ar-AE' : 'en-AE')}
+                  </p>
                 </div>
-                <Money fils={e.amountFils} className={e.amountFils < 0 ? 'text-red-700' : 'text-emerald-700'} />
+                <Money
+                  fils={e.amountFils}
+                  className={e.amountFils < 0 ? 'text-red-700' : 'text-emerald-700'}
+                />
               </li>
             ))}
           </ul>

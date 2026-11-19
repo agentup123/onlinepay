@@ -8,7 +8,12 @@ import { uaePhoneSchema } from './schemas';
 
 describe('VAT', () => {
   it('adds 5% VAT to the 30 AED bundle', () => {
-    expect(addVat(3000)).toEqual({ subtotalFils: 3000, vatFils: 150, totalFils: 3150, vatRateBps: 500 });
+    expect(addVat(3000)).toEqual({
+      subtotalFils: 3000,
+      vatFils: 150,
+      totalFils: 3150,
+      vatRateBps: 500,
+    });
   });
   it('rounds half up to the nearest fils', () => {
     expect(addVat(10).vatFils).toBe(1); // 0.5 fils -> 1
@@ -49,18 +54,29 @@ describe('bundle quota', () => {
   const statuses = ['ACTIVE', 'FROZEN', 'CANCELLED', 'CANCELLED'] as const;
   it('counts cancelled cards when the rule says so', () => {
     expect(
-      computeQuota({ purchasedSlots: 30, cardStatuses: [...statuses], cancelledCountsAgainstBundle: true }),
+      computeQuota({
+        purchasedSlots: 30,
+        cardStatuses: [...statuses],
+        cancelledCountsAgainstBundle: true,
+      }),
     ).toEqual({ purchased: 30, used: 4, remaining: 26 });
   });
   it('frees the slot of cancelled cards otherwise', () => {
     expect(
-      computeQuota({ purchasedSlots: 30, cardStatuses: [...statuses], cancelledCountsAgainstBundle: false }),
+      computeQuota({
+        purchasedSlots: 30,
+        cardStatuses: [...statuses],
+        cancelledCountsAgainstBundle: false,
+      }),
     ).toEqual({ purchased: 30, used: 2, remaining: 28 });
   });
   it('never goes negative', () => {
     expect(
-      computeQuota({ purchasedSlots: 1, cardStatuses: ['ACTIVE', 'ACTIVE'], cancelledCountsAgainstBundle: true })
-        .remaining,
+      computeQuota({
+        purchasedSlots: 1,
+        cardStatuses: ['ACTIVE', 'ACTIVE'],
+        cancelledCountsAgainstBundle: true,
+      }).remaining,
     ).toBe(0);
   });
 });

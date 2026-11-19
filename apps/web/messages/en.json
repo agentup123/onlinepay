@@ -124,7 +124,12 @@
     "noTransactions": "No transactions yet.",
     "dispute": "Report a problem",
     "simulate": "Simulate a test purchase (dev only)",
-    "txnStatus": { "PENDING": "Pending", "SETTLED": "Completed", "REVERSED": "Reversed", "DECLINED": "Declined" }
+    "txnStatus": {
+      "PENDING": "Pending",
+      "SETTLED": "Completed",
+      "REVERSED": "Reversed",
+      "DECLINED": "Declined"
+    }
   },
   "wallet": {
     "title": "Wallet",

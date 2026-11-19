@@ -3,7 +3,10 @@ import Link from 'next/link';
 import { LogoutButton } from './logout';
 import './globals.css';
 
-export const metadata: Metadata = { title: 'OnlinePay Admin', robots: { index: false, follow: false } };
+export const metadata: Metadata = {
+  title: 'OnlinePay Admin',
+  robots: { index: false, follow: false },
+};
 
 const NAV = [
   ['/', 'Overview'],

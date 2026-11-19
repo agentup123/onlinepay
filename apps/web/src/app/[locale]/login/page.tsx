@@ -19,7 +19,9 @@ export default function LoginPage() {
     setBusy(true);
     setError(null);
     try {
-      const res = await api<{ challengeId: string }>('/auth/login', { body: { email: f.get('email') } });
+      const res = await api<{ challengeId: string }>('/auth/login', {
+        body: { email: f.get('email') },
+      });
       setChallengeId(res.challengeId);
     } catch (err) {
       setError(err);
@@ -51,23 +53,51 @@ export default function LoginPage() {
           <form onSubmit={start} className="space-y-4">
             <p className="text-slate-600">{t('loginIntro')}</p>
             <div>
-              <label className="label" htmlFor="email">{t('email')}</label>
-              <input className="input" id="email" name="email" type="email" required autoComplete="email" dir="ltr" />
+              <label className="label" htmlFor="email">
+                {t('email')}
+              </label>
+              <input
+                className="input"
+                id="email"
+                name="email"
+                type="email"
+                required
+                autoComplete="email"
+                dir="ltr"
+              />
             </div>
             <ErrorText error={error} />
-            <button className="btn-primary w-full" disabled={busy}>{t('sendCode')}</button>
+            <button className="btn-primary w-full" disabled={busy}>
+              {t('sendCode')}
+            </button>
           </form>
         ) : (
           <form onSubmit={verify} className="space-y-4">
             <div>
-              <label className="label" htmlFor="code">{t('loginCode')}</label>
-              <input className="input ltr-nums tracking-widest" id="code" name="code" inputMode="numeric" pattern="\d{6}" maxLength={6} required autoComplete="one-time-code" autoFocus />
+              <label className="label" htmlFor="code">
+                {t('loginCode')}
+              </label>
+              <input
+                className="input ltr-nums tracking-widest"
+                id="code"
+                name="code"
+                inputMode="numeric"
+                pattern="\d{6}"
+                maxLength={6}
+                required
+                autoComplete="one-time-code"
+                autoFocus
+              />
             </div>
             <ErrorText error={error} />
-            <button className="btn-primary w-full" disabled={busy}>{t('verify')}</button>
+            <button className="btn-primary w-full" disabled={busy}>
+              {t('verify')}
+            </button>
           </form>
         )}
-        <Link href="/signup" className="block text-center text-sm text-brand-700">{t('noAccount')}</Link>
+        <Link href="/signup" className="block text-center text-sm text-brand-700">
+          {t('noAccount')}
+        </Link>
       </div>
     </div>
   );
